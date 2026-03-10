@@ -21,7 +21,7 @@ function SWOTCard({ category, items, icon: Icon, color }) {
       <ul className="space-y-1.5">
         {(items || []).map((item, i) => (
           <li key={i} className="text-xs text-slate-300 leading-relaxed flex gap-1.5">
-            <span className="text-slate-500 flex-shrink-0 mt-0.5">•</span>
+            <span className="text-slate-500 shrink-0 mt-0.5">•</span>
             {item}
           </li>
         ))}
@@ -185,7 +185,7 @@ export default function CompanyProfile() {
                   </Link>
                   <button
                     onClick={startNewSession}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-medium transition-all"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-medium transition-all"
                   >
                     <MessageSquare className="w-4 h-4" /> Research
                   </button>
@@ -254,7 +254,7 @@ export default function CompanyProfile() {
               <div className="flex justify-end mb-4">
                 <Link
                   href={`/documents?companyId=${id}`}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-medium transition-all"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-medium transition-all"
                 >
                   <Plus className="w-4 h-4" /> Add / Ingest Document
                 </Link>
@@ -268,7 +268,7 @@ export default function CompanyProfile() {
                 <div className="space-y-3">
                   {documents.map((doc) => (
                     <div key={doc._id} className="p-4 rounded-xl bg-slate-800/50 border border-violet-400/10 flex items-center gap-3">
-                      <FileText className="w-5 h-5 text-violet-400 flex-shrink-0" />
+                      <FileText className="w-5 h-5 text-violet-400 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-white truncate">{doc.title}</div>
                         <div className="text-xs text-slate-400">{doc.docType} · {doc.year} · {doc.chunkCount || 0} chunks</div>
@@ -295,7 +295,7 @@ export default function CompanyProfile() {
                 <button
                   onClick={generateSWOT}
                   disabled={swotLoading}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-medium transition-all disabled:opacity-60"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-medium transition-all disabled:opacity-60"
                 >
                   {swotLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                   {swot ? 'Regenerate' : 'Generate'} SWOT
@@ -324,7 +324,7 @@ export default function CompanyProfile() {
                 <button
                   onClick={generateSummary}
                   disabled={summaryLoading}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-medium transition-all disabled:opacity-60"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-medium transition-all disabled:opacity-60"
                 >
                   {summaryLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                   {summary ? 'Regenerate' : 'Generate'} Summary
@@ -349,7 +349,7 @@ export default function CompanyProfile() {
               <div className="flex justify-end mb-4">
                 <button
                   onClick={startNewSession}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-medium transition-all"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-medium transition-all"
                 >
                   <Plus className="w-4 h-4" /> New Session
                 </button>

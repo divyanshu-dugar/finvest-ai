@@ -10,10 +10,10 @@ export default function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Logo */}
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-linear-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
               <Brain className="w-4 h-4 text-white" />
             </div>
-            <span className="text-lg font-bold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
+            <span className="text-lg font-bold bg-linear-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
               Finvest AI
             </span>
           </div>

@@ -36,7 +36,7 @@ const navGroups = [
     icon: BarChart3,
     items: [
       { label: 'Research Sessions', href: '/research', icon: Layers },
-      { label: 'SWOT Analysis', href: '/companies/swot', icon: TrendingUp },
+      { label: 'SWOT Analysis', href: '/companies/list', icon: TrendingUp },
     ],
   },
 ];
@@ -83,10 +83,10 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href={isLoggedIn ? '/dashboard' : '/'} className="flex items-center gap-2 group">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-md shadow-violet-500/30">
+            <div className="w-8 h-8 rounded-lg bg-linear-to from-violet-500 to-indigo-600 flex items-center justify-center shadow-md shadow-violet-500/30">
               <Brain className="w-4 h-4 text-white" />
             </div>
-            <span className="text-lg font-bold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
+            <span className="text-lg font-bold bg-linear-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
               Finvest AI
             </span>
           </Link>
@@ -187,7 +187,7 @@ export default function Navbar() {
                 </Link>
                 <Link
                   href="/register"
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white transition-all shadow-md shadow-violet-500/30"
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white transition-all shadow-md shadow-violet-500/30"
                 >
                   Get Started
                 </Link>
@@ -267,7 +267,7 @@ export default function Navbar() {
                   <Link
                     href="/register"
                     onClick={() => setIsOpen(false)}
-                    className="flex items-center px-3 py-2.5 rounded-lg text-sm font-medium bg-gradient-to-r from-violet-600 to-indigo-600 text-white"
+                    className="flex items-center px-3 py-2.5 rounded-lg text-sm font-medium bg-linear-to-r from-violet-600 to-indigo-600 text-white"
                   >
                     Get Started
                   </Link>

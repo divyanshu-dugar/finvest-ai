@@ -97,7 +97,7 @@ export default function DashboardPage() {
         >
           <h1 className="text-3xl font-bold text-white">
             Welcome back,{' '}
-            <span className="bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
               {userName}
             </span>
           </h1>
@@ -118,7 +118,7 @@ export default function DashboardPage() {
                 className="block p-5 rounded-2xl bg-slate-800/50 border border-violet-400/10 hover:border-violet-400/30 transition-all group"
               >
                 <div className="flex items-center justify-between mb-3">
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${card.accent} flex items-center justify-center shadow-md`}>
+                  <div className={`w-10 h-10 rounded-xl bg-linear-to-br ${card.accent} flex items-center justify-center shadow-md`}>
                     <card.icon className="w-5 h-5 text-white" />
                   </div>
                   <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-violet-400 group-hover:translate-x-0.5 transition-all" />
@@ -164,7 +164,7 @@ export default function DashboardPage() {
                     href={`/companies/${company._id}`}
                     className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/50 hover:bg-slate-800 transition-colors group"
                   >
-                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-500/20 to-indigo-600/20 border border-violet-400/20 flex items-center justify-center text-lg">
+                    <div className="w-9 h-9 rounded-lg bg-linear-to-br from-violet-500/20 to-indigo-600/20 border border-violet-400/20 flex items-center justify-center text-lg">
                       {company.emoji || '🏢'}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -216,7 +216,7 @@ export default function DashboardPage() {
                     href={`/research/${session._id}`}
                     className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/50 hover:bg-slate-800 transition-colors group"
                   >
-                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500/20 to-violet-600/20 border border-indigo-400/20 flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-lg bg-linear-to-br from-indigo-500/20 to-violet-600/20 border border-indigo-400/20 flex items-center justify-center">
                       <Activity className="w-4 h-4 text-indigo-400" />
                     </div>
                     <div className="flex-1 min-w-0">

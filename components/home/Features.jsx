@@ -86,7 +86,7 @@ export default function Features() {
           </span>
           <h2 className="text-4xl sm:text-5xl font-bold text-white mb-4">
             Everything you need to{' '}
-            <span className="bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
               research smarter
             </span>
           </h2>
@@ -109,7 +109,7 @@ export default function Features() {
               variants={cardVariants}
               className="group relative p-6 rounded-2xl bg-slate-800/50 border border-violet-400/10 hover:border-violet-400/30 transition-all hover:bg-slate-800"
             >
-              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${f.accent} flex items-center justify-center mb-4 shadow-lg`}>
+              <div className={`w-12 h-12 rounded-xl bg-linear-to-br ${f.accent} flex items-center justify-center mb-4 shadow-lg`}>
                 <f.icon className="w-6 h-6 text-white" />
               </div>
               <h3 className="text-lg font-semibold text-white mb-2">{f.title}</h3>

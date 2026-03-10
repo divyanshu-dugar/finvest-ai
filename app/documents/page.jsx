@@ -167,7 +167,7 @@ export default function DocumentsPage() {
                 </button>
                 <button
                   onClick={() => setShowAddForm(!showAddForm)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-medium transition-all"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-medium transition-all"
                 >
                   <Plus className="w-4 h-4" /> Add Document
                 </button>
@@ -259,7 +259,7 @@ export default function DocumentsPage() {
               </div>
               {addError && <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{addError}</p>}
               <div className="flex gap-3">
-                <button type="submit" disabled={addLoading} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-medium disabled:opacity-60">
+                <button type="submit" disabled={addLoading} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 text-white text-sm font-medium disabled:opacity-60">
                   {addLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add & Embed'}
                 </button>
                 <button type="button" onClick={() => setShowAddForm(false)} className="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-sm hover:bg-slate-700 transition-colors">
@@ -295,7 +295,7 @@ export default function DocumentsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="p-4 rounded-xl bg-slate-800/50 border border-violet-400/10 hover:border-violet-400/20 transition-all flex items-center gap-4"
               >
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-indigo-600/20 border border-violet-400/20 flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-linear-to-br from-violet-500/20 to-indigo-600/20 border border-violet-400/20 flex items-center justify-center shrink-0">
                   <FileText className="w-5 h-5 text-violet-400" />
                 </div>
                 <div className="flex-1 min-w-0">

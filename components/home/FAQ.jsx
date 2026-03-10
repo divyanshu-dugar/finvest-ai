@@ -48,7 +48,7 @@ function FAQItem({ item, i }) {
       >
         <span className="text-white font-medium text-sm sm:text-base pr-4">{item.q}</span>
         <ChevronDown
-          className={`w-5 h-5 text-violet-400 flex-shrink-0 transition-transform duration-300 ${
+          className={`w-5 h-5 text-violet-400 shrink-0 transition-transform duration-300 ${
             open ? 'rotate-180' : ''
           }`}
         />
@@ -91,7 +91,7 @@ export default function FAQ() {
           </span>
           <h2 className="text-4xl font-bold text-white mb-3">
             Common{' '}
-            <span className="bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
               questions
             </span>
           </h2>

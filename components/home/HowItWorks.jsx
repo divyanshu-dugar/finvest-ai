@@ -64,7 +64,7 @@ export default function HowItWorks() {
           </span>
           <h2 className="text-4xl sm:text-5xl font-bold text-white mb-4">
             From ticker to insight in{' '}
-            <span className="bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
               4 steps
             </span>
           </h2>
@@ -85,8 +85,8 @@ export default function HowItWorks() {
               variants={itemVariants}
               className="flex gap-5 p-6 rounded-2xl bg-slate-800/40 border border-violet-400/10 hover:border-violet-400/25 transition-all"
             >
-              <div className="flex-shrink-0">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
+              <div className="shrink-0">
+                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
                   <s.icon className="w-6 h-6 text-white" />
                 </div>
               </div>

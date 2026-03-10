@@ -58,7 +58,7 @@ export default function RegisterPage() {
         <div className="bg-slate-900 border border-violet-400/20 rounded-2xl p-8 shadow-2xl shadow-violet-900/20">
           {/* Logo */}
           <div className="flex flex-col items-center mb-8">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center mb-3 shadow-lg shadow-violet-500/30">
+            <div className="w-12 h-12 rounded-xl bg-linear-to-br from-violet-500 to-indigo-600 flex items-center justify-center mb-3 shadow-lg shadow-violet-500/30">
               <Brain className="w-6 h-6 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-white">Create account</h1>
@@ -130,7 +130,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/20 flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-xl font-semibold text-white bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/20 flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Create Account'}
             </button>

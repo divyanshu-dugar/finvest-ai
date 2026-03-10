@@ -28,7 +28,7 @@ function MessageBubble({ message }) {
       className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}
     >
       {!isUser && (
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 mt-1 shadow-md shadow-violet-500/20">
+        <div className="w-8 h-8 rounded-full bg-linear-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0 mt-1 shadow-md shadow-violet-500/20">
           <Brain className="w-4 h-4 text-white" />
         </div>
       )}
@@ -37,7 +37,7 @@ function MessageBubble({ message }) {
         <div
           className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
             isUser
-              ? 'bg-gradient-to-br from-violet-600 to-indigo-600 text-white rounded-tr-sm'
+              ? 'bg-linear-to-br from-violet-600 to-indigo-600 text-white rounded-tr-sm'
               : 'bg-slate-800 text-slate-200 rounded-tl-sm border border-violet-400/10'
           }`}
         >
@@ -55,7 +55,7 @@ function MessageBubble({ message }) {
       </div>
 
       {isUser && (
-        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0 mt-1">
+        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center shrink-0 mt-1">
           <User className="w-4 h-4 text-slate-300" />
         </div>
       )}
@@ -66,7 +66,7 @@ function MessageBubble({ message }) {
 function TypingIndicator() {
   return (
     <div className="flex gap-3 justify-start">
-      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+      <div className="w-8 h-8 rounded-full bg-linear-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0">
         <Brain className="w-4 h-4 text-white" />
       </div>
       <div className="bg-slate-800 border border-violet-400/10 px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-1.5">
@@ -201,7 +201,7 @@ export default function ResearchChatPage() {
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500/20 to-indigo-600/20 border border-violet-400/20 flex items-center justify-center flex-shrink-0">
+          <div className="w-9 h-9 rounded-full bg-linear-to-br from-violet-500/20 to-indigo-600/20 border border-violet-400/20 flex items-center justify-center shrink-0">
             {company ? (
               <span className="text-lg">{company.emoji || '🏢'}</span>
             ) : (
@@ -223,7 +223,7 @@ export default function ResearchChatPage() {
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-5">
         {messages.length === 0 && !sending && (
           <div className="flex flex-col items-center justify-center h-full text-center py-8">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center mb-4 shadow-lg shadow-violet-500/20">
+            <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-violet-500 to-indigo-600 flex items-center justify-center mb-4 shadow-lg shadow-violet-500/20">
               <Brain className="w-7 h-7 text-white" />
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">Start your research</h3>
@@ -274,7 +274,7 @@ export default function ResearchChatPage() {
           <button
             onClick={handleSend}
             disabled={!input.trim() || sending}
-            className="w-12 h-12 flex items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white shadow-lg shadow-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex-shrink-0"
+            className="w-12 h-12 flex items-center justify-center rounded-xl bg-linear-to-br from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white shadow-lg shadow-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all shrink-0"
           >
             {sending ? (
               <Loader2 className="w-5 h-5 animate-spin" />

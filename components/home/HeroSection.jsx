@@ -63,7 +63,7 @@ export default function HeroSection() {
           className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white leading-tight mb-6"
         >
           Research Any Company{' '}
-          <span className="bg-gradient-to-r from-violet-400 via-indigo-400 to-violet-400 bg-clip-text text-transparent">
+          <span className="bg-linear-to-r from-violet-400 via-indigo-400 to-violet-400 bg-clip-text text-transparent">
             10x Faster
           </span>
         </motion.h1>
@@ -81,7 +81,7 @@ export default function HeroSection() {
         <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
           <Link
             href="/register"
-            className="group inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold text-lg transition-all shadow-2xl shadow-violet-500/30 hover:shadow-violet-500/50"
+            className="group inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold text-lg transition-all shadow-2xl shadow-violet-500/30 hover:shadow-violet-500/50"
           >
             Start Researching
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />

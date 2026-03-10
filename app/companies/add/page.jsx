@@ -74,7 +74,7 @@ export default function AddCompanyPage() {
           className="bg-slate-900 border border-violet-400/20 rounded-2xl p-8"
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-linear-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
               <Building2 className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -225,7 +225,7 @@ export default function AddCompanyPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/20 flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-xl font-semibold text-white bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/20 flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Add Company'}
             </button>

@@ -97,7 +97,7 @@ export default function ResearchSessionsPage() {
           </div>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-medium text-sm transition-all shadow-lg shadow-violet-500/20"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-medium text-sm transition-all shadow-lg shadow-violet-500/20"
           >
             <Plus className="w-4 h-4" /> New Session
           </button>
@@ -140,7 +140,7 @@ export default function ResearchSessionsPage() {
                 <button
                   type="submit"
                   disabled={creating}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-medium disabled:opacity-60"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 text-white text-sm font-medium disabled:opacity-60"
                 >
                   {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create & Open'}
                 </button>
@@ -184,7 +184,7 @@ export default function ResearchSessionsPage() {
                     href={`/research/${session._id}`}
                     className="flex items-center gap-4 p-4 rounded-xl bg-slate-800/50 border border-violet-400/10 hover:border-violet-400/30 hover:bg-slate-800 transition-all group"
                   >
-                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500/20 to-indigo-600/20 border border-violet-400/20 flex items-center justify-center flex-shrink-0">
+                    <div className="w-11 h-11 rounded-xl bg-linear-to-br from-violet-500/20 to-indigo-600/20 border border-violet-400/20 flex items-center justify-center shrink-0">
                       {company ? (
                         <span className="text-xl">{company.emoji || '🏢'}</span>
                       ) : (
