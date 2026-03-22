@@ -10,6 +10,15 @@ import {
   TrendingUp, TrendingDown, AlertTriangle, Lightbulb,
 } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/authenticate';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from 'recharts';
 
 function SWOTCard({ category, items, icon: Icon, color }) {
   return (
@@ -45,6 +54,9 @@ export default function CompanyProfile() {
   const [loading, setLoading] = useState(true);
   const [swotLoading, setSwotLoading] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [marketData, setMarketData] = useState(null);
+  const [marketLoading, setMarketLoading] = useState(false);
+  const [marketError, setMarketError] = useState('');
 
   useEffect(() => {
     fetchCompanyData();
@@ -64,11 +76,59 @@ export default function CompanyProfile() {
       setCompany(companyData);
       setDocuments(docsData);
       setSessions(sessionsData);
+      if (companyData?.ticker) {
+        fetchMarketData();
+      }
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchMarketData = async () => {
+    setMarketLoading(true);
+    setMarketError('');
+    try {
+      const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/companies/${id}/market-data`);
+      const data = await res.json();
+      if (!res.ok) {
+        setMarketError(data.error || 'Unable to load market data');
+        setMarketData(null);
+        return;
+      }
+      setMarketData(data);
+    } catch (err) {
+      console.error(err);
+      setMarketError('Unable to load market data');
+      setMarketData(null);
+    } finally {
+      setMarketLoading(false);
+    }
+  };
+
+  const formatMoney = (value, currency = 'USD') => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) return 'N/A';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 2,
+    }).format(Number(value));
+  };
+
+  const formatCompactMoney = (value, currency = 'USD') => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) return 'N/A';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      notation: 'compact',
+      maximumFractionDigits: 2,
+    }).format(Number(value));
+  };
+
+  const formatNumber = (value, digits = 2) => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) return 'N/A';
+    return Number(value).toFixed(digits);
   };
 
   const generateSWOT = async () => {
@@ -231,20 +291,130 @@ export default function CompanyProfile() {
         <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
           {/* Overview */}
           {activeTab === 'overview' && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                { label: 'Documents Indexed', value: documents.length, icon: FileText },
-                { label: 'Research Sessions', value: sessions.length, icon: MessageSquare },
-                { label: 'Chunks in Qdrant', value: documents.reduce((acc, d) => acc + (d.chunkCount || 0), 0), icon: BarChart3 },
-              ].map((stat) => (
-                <div key={stat.label} className="p-5 rounded-2xl bg-slate-900 border border-violet-400/10">
-                  <div className="flex items-center gap-2 mb-2">
-                    <stat.icon className="w-4 h-4 text-violet-400" />
-                    <span className="text-sm text-slate-400">{stat.label}</span>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {[
+                  { label: 'Documents Indexed', value: documents.length, icon: FileText },
+                  { label: 'Research Sessions', value: sessions.length, icon: MessageSquare },
+                  { label: 'Chunks in Qdrant', value: documents.reduce((acc, d) => acc + (d.chunkCount || 0), 0), icon: BarChart3 },
+                ].map((stat) => (
+                  <div key={stat.label} className="p-5 rounded-2xl bg-slate-900 border border-violet-400/10">
+                    <div className="flex items-center gap-2 mb-2">
+                      <stat.icon className="w-4 h-4 text-violet-400" />
+                      <span className="text-sm text-slate-400">{stat.label}</span>
+                    </div>
+                    <div className="text-3xl font-bold text-white">{stat.value}</div>
                   </div>
-                  <div className="text-3xl font-bold text-white">{stat.value}</div>
+                ))}
+              </div>
+
+              <div className="rounded-2xl bg-slate-900 border border-violet-400/10 p-5">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <div>
+                    <h3 className="text-white font-semibold text-base">Market Snapshot</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {company.ticker ? `${company.ticker} · 1Y price chart and key metrics` : 'Add ticker to view market data'}
+                    </p>
+                  </div>
+                  {company.ticker && (
+                    <button
+                      onClick={fetchMarketData}
+                      disabled={marketLoading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors disabled:opacity-60"
+                    >
+                      {marketLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                      Refresh
+                    </button>
+                  )}
                 </div>
-              ))}
+
+                {!company.ticker && (
+                  <div className="text-sm text-slate-400">Ticker is required for live market data.</div>
+                )}
+
+                {company.ticker && marketError && (
+                  <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{marketError}</div>
+                )}
+
+                {company.ticker && !marketError && marketLoading && !marketData && (
+                  <div className="h-60 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+                  </div>
+                )}
+
+                {company.ticker && marketData && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                      <div className="rounded-lg bg-slate-800/60 border border-slate-700 p-3">
+                        <div className="text-xs text-slate-400">Current Price</div>
+                        <div className="text-sm font-semibold text-white mt-1">
+                          {formatMoney(marketData.quote?.currentPrice, marketData.currency)}
+                        </div>
+                      </div>
+                      <div className="rounded-lg bg-slate-800/60 border border-slate-700 p-3">
+                        <div className="text-xs text-slate-400">Daily Change</div>
+                        <div className={`text-sm font-semibold mt-1 ${Number(marketData.quote?.change || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {formatMoney(marketData.quote?.change, marketData.currency)} ({formatNumber(marketData.quote?.changePercent)}%)
+                        </div>
+                      </div>
+                      <div className="rounded-lg bg-slate-800/60 border border-slate-700 p-3">
+                        <div className="text-xs text-slate-400">P/E Ratio</div>
+                        <div className="text-sm font-semibold text-white mt-1">{formatNumber(marketData.metrics?.peRatio)}</div>
+                      </div>
+                      <div className="rounded-lg bg-slate-800/60 border border-slate-700 p-3">
+                        <div className="text-xs text-slate-400">Market Cap</div>
+                        <div className="text-sm font-semibold text-white mt-1">
+                          {formatCompactMoney(marketData.metrics?.marketCap, marketData.currency)}
+                        </div>
+                      </div>
+                      <div className="rounded-lg bg-slate-800/60 border border-slate-700 p-3">
+                        <div className="text-xs text-slate-400">52W High</div>
+                        <div className="text-sm font-semibold text-white mt-1">
+                          {formatMoney(marketData.metrics?.week52High, marketData.currency)}
+                        </div>
+                      </div>
+                      <div className="rounded-lg bg-slate-800/60 border border-slate-700 p-3">
+                        <div className="text-xs text-slate-400">52W Low</div>
+                        <div className="text-sm font-semibold text-white mt-1">
+                          {formatMoney(marketData.metrics?.week52Low, marketData.currency)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="h-64 w-full rounded-xl bg-slate-800/40 border border-slate-700 p-2">
+                      {(marketData.chart?.points || []).length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={marketData.chart?.points || []}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                            <XAxis dataKey="date" hide />
+                            <YAxis domain={["auto", "auto"]} tick={{ fill: '#94a3b8', fontSize: 11 }} width={55} />
+                            <Tooltip
+                              contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px' }}
+                              labelStyle={{ color: '#e2e8f0' }}
+                              formatter={(value) => [formatMoney(value, marketData.currency), 'Close']}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="close"
+                              stroke="#8b5cf6"
+                              strokeWidth={2}
+                              dot={false}
+                              activeDot={{ r: 4 }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-sm text-slate-400">
+                          No chart data available for this ticker right now.
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Source: {marketData.provider}. Last updated: {new Date(marketData.lastUpdated).toLocaleString()}.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
