@@ -113,12 +113,13 @@ export default function CompanyProfile() {
     }
   };
 
-  const fetchMetricDetail = async (metricKey) => {
+  const fetchMetricDetail = async (metricKey, forceRefresh = false) => {
     setSelectedMetricKey(metricKey);
     setMetricDetailLoading(true);
     setMetricDetailError('');
     try {
-      const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/companies/${id}/sec-metrics/${metricKey}`);
+      const refreshParam = forceRefresh ? `?refresh=1&t=${Date.now()}` : '';
+      const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/companies/${id}/sec-metrics/${metricKey}${refreshParam}`);
       const data = await res.json();
       if (!res.ok) {
         setMetricDetailError(data.error || 'Unable to fetch metric explanation');
@@ -522,7 +523,19 @@ export default function CompanyProfile() {
               </div>
 
               <div className="rounded-2xl bg-slate-900 border border-violet-400/10 p-5">
-                <h3 className="text-white font-semibold text-base mb-3">Metric Explanation</h3>
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h3 className="text-white font-semibold text-base">Metric Explanation</h3>
+                  {selectedMetricKey && (
+                    <button
+                      onClick={() => fetchMetricDetail(selectedMetricKey, true)}
+                      disabled={metricDetailLoading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors disabled:opacity-60"
+                    >
+                      {metricDetailLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                      Re-fetch
+                    </button>
+                  )}
+                </div>
 
                 {!selectedMetricKey && (
                   <div className="text-sm text-slate-400">
