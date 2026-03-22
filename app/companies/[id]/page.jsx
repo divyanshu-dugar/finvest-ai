@@ -57,6 +57,13 @@ export default function CompanyProfile() {
   const [marketData, setMarketData] = useState(null);
   const [marketLoading, setMarketLoading] = useState(false);
   const [marketError, setMarketError] = useState('');
+  const [secMetricGroups, setSecMetricGroups] = useState([]);
+  const [secMetricLoading, setSecMetricLoading] = useState(false);
+  const [secMetricError, setSecMetricError] = useState('');
+  const [selectedMetricKey, setSelectedMetricKey] = useState('');
+  const [metricDetail, setMetricDetail] = useState(null);
+  const [metricDetailLoading, setMetricDetailLoading] = useState(false);
+  const [metricDetailError, setMetricDetailError] = useState('');
 
   useEffect(() => {
     fetchCompanyData();
@@ -78,11 +85,53 @@ export default function CompanyProfile() {
       setSessions(sessionsData);
       if (companyData?.ticker) {
         fetchMarketData();
+        fetchSecMetricCatalog();
       }
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSecMetricCatalog = async () => {
+    setSecMetricLoading(true);
+    setSecMetricError('');
+    try {
+      const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/companies/${id}/sec-metrics`);
+      const data = await res.json();
+      if (!res.ok) {
+        setSecMetricError(data.error || 'Unable to load SEC metrics');
+        return;
+      }
+      setSecMetricGroups(data.groups || []);
+    } catch (err) {
+      console.error(err);
+      setSecMetricError('Unable to load SEC metrics');
+    } finally {
+      setSecMetricLoading(false);
+    }
+  };
+
+  const fetchMetricDetail = async (metricKey) => {
+    setSelectedMetricKey(metricKey);
+    setMetricDetailLoading(true);
+    setMetricDetailError('');
+    try {
+      const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/companies/${id}/sec-metrics/${metricKey}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setMetricDetailError(data.error || 'Unable to fetch metric explanation');
+        setMetricDetail(null);
+        return;
+      }
+      setMetricDetail(data);
+    } catch (err) {
+      console.error(err);
+      setMetricDetailError('Unable to fetch metric explanation');
+      setMetricDetail(null);
+    } finally {
+      setMetricDetailLoading(false);
     }
   };
 
@@ -178,6 +227,7 @@ export default function CompanyProfile() {
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Building2 },
+    { id: 'metrics', label: 'Metrics', icon: BarChart3 },
     { id: 'documents', label: `Documents (${documents.length})`, icon: FileText },
     { id: 'swot', label: 'SWOT', icon: BarChart3 },
     { id: 'summary', label: 'AI Summary', icon: MessageSquare },
@@ -412,6 +462,97 @@ export default function CompanyProfile() {
                     <p className="text-[11px] text-slate-500">
                       Source: {marketData.provider}. Last updated: {new Date(marketData.lastUpdated).toLocaleString()}.
                     </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'metrics' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <div className="rounded-2xl bg-slate-900 border border-violet-400/10 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-white font-semibold text-base">SEC Filing Metrics</h3>
+                  <button
+                    onClick={fetchSecMetricCatalog}
+                    disabled={secMetricLoading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors disabled:opacity-60"
+                  >
+                    {secMetricLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                    Refresh
+                  </button>
+                </div>
+
+                <p className="text-xs text-slate-400 mb-4">
+                  Click any metric to fetch the latest SEC XBRL value and a plain-English explanation.
+                </p>
+
+                {secMetricError && (
+                  <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 mb-4">
+                    {secMetricError}
+                  </div>
+                )}
+
+                {!secMetricError && secMetricGroups.length === 0 && !secMetricLoading && (
+                  <div className="text-sm text-slate-400">No SEC metric groups available.</div>
+                )}
+
+                <div className="space-y-4 max-h-128 overflow-y-auto pr-1">
+                  {secMetricGroups.map((group) => (
+                    <div key={group.id}>
+                      <h4 className="text-sm font-semibold text-violet-300 mb-2">{group.title}</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {(group.metrics || []).map((metric) => (
+                          <button
+                            key={metric.key}
+                            onClick={() => fetchMetricDetail(metric.key)}
+                            className={`text-left px-3 py-2 rounded-lg border text-sm transition-colors ${
+                              selectedMetricKey === metric.key
+                                ? 'border-violet-400 bg-violet-500/10 text-violet-200'
+                                : 'border-slate-700 bg-slate-800/60 text-slate-300 hover:border-violet-400/40 hover:text-white'
+                            }`}
+                          >
+                            {metric.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-slate-900 border border-violet-400/10 p-5">
+                <h3 className="text-white font-semibold text-base mb-3">Metric Explanation</h3>
+
+                {!selectedMetricKey && (
+                  <div className="text-sm text-slate-400">
+                    Select a metric from the list to see the fetched value, what it means, formula, and why it matters.
+                  </div>
+                )}
+
+                {metricDetailLoading && (
+                  <div className="h-48 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+                  </div>
+                )}
+
+                {metricDetailError && !metricDetailLoading && (
+                  <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                    {metricDetailError}
+                  </div>
+                )}
+
+                {metricDetail && !metricDetailLoading && !metricDetailError && (
+                  <div>
+                    <div className="mb-3 text-xs text-slate-400">
+                      {metricDetail.metric?.groupTitle} · {metricDetail.ticker}
+                    </div>
+                    <div className="text-sm font-semibold text-white mb-3">
+                      {metricDetail.metric?.label}
+                    </div>
+                    <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700 text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
+                      {metricDetail.explanation}
+                    </div>
                   </div>
                 )}
               </div>
