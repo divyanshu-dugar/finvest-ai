@@ -4,13 +4,12 @@
 
 ### Introduction
 
-In today’s world, investors and analysts are surrounded by an overwhelming amount of financial information. Important details about a company are spread across annual reports, earnings calls, news articles, press releases, and market analyses. Reading and understanding all of these documents takes a significant amount of time and expertise.
+In today’s world, `investors` and `analysts` are surrounded by an overwhelming amount of financial information. Important details about a company are spread across `annual reports`, `earnings calls`, `news articles`, `press releases`, and `market analyses`. Reading and understanding all of these documents takes a significant amount of time and expertise.
 
 This project proposes the development of an **AI-powered company research assistant** that helps users quickly understand a company by automatically collecting, analyzing, and summarizing information from multiple sources.
 
 The goal is to make **company research faster, simpler, and more accessible**, especially for students, beginner investors, and individuals who want to understand businesses without reading hundreds of pages of reports.
 
----
 
 ### Problem
 
