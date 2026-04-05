@@ -46,6 +46,8 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(null);
   const [ingesting, setIngesting] = useState(false);
+  const [ingestTypes, setIngestTypes] = useState(['10-K']);
+  const [showIngestPanel, setShowIngestPanel] = useState(false);
 
   // Add form state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -103,15 +105,22 @@ export default function DocumentsPage() {
     }
   };
 
+  const toggleIngestType = (type) => {
+    setIngestTypes((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
+  };
+
   const handleIngest = async () => {
-    if (!selectedCompany) return;
+    if (!selectedCompany || ingestTypes.length === 0) return;
     setIngesting(true);
     try {
       const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/documents/ingest`, {
         method: 'POST',
-        body: JSON.stringify({ companyId: selectedCompany }),
+        body: JSON.stringify({ companyId: selectedCompany, docTypes: ingestTypes }),
       });
       if (res.ok) {
+        setShowIngestPanel(false);
         await fetchDocuments(selectedCompany);
       }
     } catch (err) {
@@ -158,11 +167,14 @@ export default function DocumentsPage() {
             {selectedCompany && (
               <>
                 <button
-                  onClick={handleIngest}
-                  disabled={ingesting}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 border border-violet-400/20 hover:border-violet-400/40 text-slate-300 hover:text-white text-sm font-medium transition-all disabled:opacity-60"
+                  onClick={() => setShowIngestPanel((v) => !v)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                    showIngestPanel
+                      ? 'bg-violet-600 border-violet-500 text-white'
+                      : 'bg-slate-800 border-violet-400/20 hover:border-violet-400/40 text-slate-300 hover:text-white'
+                  }`}
                 >
-                  {ingesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  <Download className="w-4 h-4" />
                   Auto-Ingest SEC
                 </button>
                 <button
@@ -193,6 +205,46 @@ export default function DocumentsPage() {
             </button>
           ))}
         </div>
+
+        {/* Ingest Panel */}
+        {showIngestPanel && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-slate-900 border border-violet-400/20 rounded-2xl p-5 mb-6"
+          >
+            <h3 className="text-base font-semibold text-white mb-1">Auto-Ingest SEC Filings</h3>
+            <p className="text-xs text-slate-400 mb-4">Select which filing types to fetch from SEC EDGAR. Each will be chunked and embedded into your vector store.</p>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {[{ key: '10-K', label: '10-K · Annual Report' }, { key: '10-Q', label: '10-Q · Quarterly Report' }, { key: '8-K', label: '8-K · Current Report' }].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => toggleIngestType(key)}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
+                    ingestTypes.includes(key)
+                      ? 'bg-violet-600 border-violet-500 text-white'
+                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-violet-400/40 hover:text-white'
+                  }`}
+                >
+                  {ingestTypes.includes(key) && <span className="mr-1">✓</span>}{label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-3 items-center">
+              <button
+                onClick={handleIngest}
+                disabled={ingesting || ingestTypes.length === 0}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-medium transition-all disabled:opacity-60"
+              >
+                {ingesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                {ingesting ? 'Fetching from SEC...' : `Ingest ${ingestTypes.length > 0 ? ingestTypes.join(' + ') : ''}`}
+              </button>
+              <button onClick={() => setShowIngestPanel(false)} className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-400 text-sm hover:text-white transition-colors">
+                Cancel
+              </button>
+            </div>
+          </motion.div>
+        )}
 
         {/* Add Document form */}
         {showAddForm && (

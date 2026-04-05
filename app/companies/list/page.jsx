@@ -66,8 +66,34 @@ export default function CompanyListPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center pt-16">
-        <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+      <div className="min-h-screen bg-slate-950 pt-20 pb-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+            <div>
+              <div className="h-9 w-48 bg-slate-800 rounded-xl animate-pulse mb-2" />
+              <div className="h-4 w-32 bg-slate-800/60 rounded-lg animate-pulse" />
+            </div>
+            <div className="h-10 w-36 bg-slate-800 rounded-xl animate-pulse" />
+          </div>
+          <div className="h-12 w-full bg-slate-800 rounded-xl animate-pulse mb-6" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <div key={i} className="p-5 rounded-2xl bg-slate-800/50 border border-violet-400/10 animate-pulse relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-slate-700 rounded-t-2xl" />
+                <div className="flex items-start justify-between mb-3 pt-1">
+                  <div className="w-10 h-10 bg-slate-700 rounded-xl" />
+                </div>
+                <div className="h-5 w-3/4 bg-slate-700 rounded mb-1" />
+                <div className="h-4 w-1/3 bg-slate-700/60 rounded mb-2" />
+                <div className="h-5 w-1/2 bg-slate-700/40 rounded-full mb-3" />
+                <div className="flex items-center justify-between border-t border-slate-700 pt-3">
+                  <div className="h-3 w-14 bg-slate-700 rounded" />
+                  <div className="h-3 w-10 bg-slate-700 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

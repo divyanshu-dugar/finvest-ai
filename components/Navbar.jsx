@@ -19,6 +19,7 @@ import {
   Brain,
   TrendingUp,
   Layers,
+  TableProperties,
 } from 'lucide-react';
 
 const navGroups = [
@@ -37,6 +38,7 @@ const navGroups = [
     items: [
       { label: 'Research Sessions', href: '/research', icon: Layers },
       { label: 'SWOT Analysis', href: '/companies/list', icon: TrendingUp },
+      { label: 'Table Extractor', href: '/extract', icon: TableProperties },
     ],
   },
 ];

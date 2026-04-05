@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Building2, FileText, MessageSquare, Activity, Plus, ArrowRight, Loader2 } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/authenticate';
+import OnboardingModal from '@/components/OnboardingModal';
 
 const containerVariants = {
   hidden: {},
@@ -80,14 +81,51 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center pt-16">
-        <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+      <div className="min-h-screen bg-slate-950 pt-20 pb-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header skeleton */}
+          <div className="mb-8">
+            <div className="h-9 w-64 bg-slate-800 rounded-xl animate-pulse mb-2" />
+            <div className="h-4 w-40 bg-slate-800/60 rounded-lg animate-pulse" />
+          </div>
+          {/* Metric card skeletons */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="p-5 rounded-2xl bg-slate-800/50 border border-violet-400/10 animate-pulse">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-slate-700" />
+                  <div className="w-4 h-4 rounded bg-slate-700" />
+                </div>
+                <div className="h-9 w-12 bg-slate-700 rounded-lg mb-1" />
+                <div className="h-4 w-32 bg-slate-700/60 rounded" />
+              </div>
+            ))}
+          </div>
+          {/* Two-column skeletons */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {[1, 2].map((i) => (
+              <div key={i} className="bg-slate-900 border border-violet-400/10 rounded-2xl p-6 animate-pulse">
+                <div className="h-5 w-40 bg-slate-700 rounded mb-4" />
+                {[1, 2, 3].map((j) => (
+                  <div key={j} className="flex items-center gap-3 p-3 rounded-xl mb-2">
+                    <div className="w-9 h-9 rounded-lg bg-slate-700 shrink-0" />
+                    <div className="flex-1">
+                      <div className="h-4 w-3/4 bg-slate-700 rounded mb-1.5" />
+                      <div className="h-3 w-1/2 bg-slate-700/60 rounded" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-slate-950 pt-20 pb-12 px-4 sm:px-6 lg:px-8">
+      <OnboardingModal />
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div
