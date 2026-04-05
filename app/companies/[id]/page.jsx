@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   ArrowLeft, Building2, FileText, MessageSquare, BarChart3,
   Globe, Edit2, Loader2, Plus, ExternalLink, RefreshCw,
-  TrendingUp, TrendingDown, AlertTriangle, Lightbulb,
+  TrendingUp, TrendingDown, AlertTriangle, Lightbulb, PieChart,
 } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/authenticate';
 import {
@@ -64,6 +66,14 @@ export default function CompanyProfile() {
   const [metricDetail, setMetricDetail] = useState(null);
   const [metricDetailLoading, setMetricDetailLoading] = useState(false);
   const [metricDetailError, setMetricDetailError] = useState('');
+  const [ratios, setRatios] = useState(null);
+  const [ratiosLoading, setRatiosLoading] = useState(false);
+  const [ratiosError, setRatiosError] = useState('');
+  const [trendMetric, setTrendMetric] = useState('revenue');
+  const [trendYears, setTrendYears] = useState(5);
+  const [trend, setTrend] = useState(null);
+  const [trendLoading, setTrendLoading] = useState(false);
+  const [trendError, setTrendError] = useState('');
 
   useEffect(() => {
     fetchCompanyData();
@@ -136,8 +146,41 @@ export default function CompanyProfile() {
     }
   };
 
+  const fetchRatios = async () => {
+    setRatiosLoading(true);
+    setRatiosError('');
+    try {
+      const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/companies/${id}/ratios`);
+      const data = await res.json();
+      if (!res.ok) { setRatiosError(data.error || 'Unable to load financial ratios'); return; }
+      setRatios(data);
+    } catch (err) {
+      console.error(err);
+      setRatiosError('Unable to load financial ratios');
+    } finally {
+      setRatiosLoading(false);
+    }
+  };
+
+  const fetchTrend = async (metric = trendMetric, years = trendYears) => {
+    setTrendLoading(true);
+    setTrendError('');
+    try {
+      const res = await authenticatedFetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/companies/${id}/trend?metric=${encodeURIComponent(metric)}&years=${years}`,
+      );
+      const data = await res.json();
+      if (!res.ok) { setTrendError(data.error || 'Unable to load trend data'); return; }
+      setTrend(data);
+    } catch (err) {
+      console.error(err);
+      setTrendError('Unable to load trend data');
+    } finally {
+      setTrendLoading(false);
+    }
+  };
+
   const fetchMarketData = async () => {
-    setMarketLoading(true);
     setMarketError('');
     try {
       const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/companies/${id}/market-data`);
@@ -229,6 +272,8 @@ export default function CompanyProfile() {
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Building2 },
     { id: 'metrics', label: 'Metrics', icon: BarChart3 },
+    { id: 'ratios', label: 'Ratios', icon: PieChart },
+    { id: 'trends', label: 'Trends', icon: TrendingUp },
     { id: 'documents', label: `Documents (${documents.length})`, icon: FileText },
     { id: 'swot', label: 'SWOT', icon: BarChart3 },
     { id: 'summary', label: 'AI Summary', icon: MessageSquare },
@@ -569,6 +614,157 @@ export default function CompanyProfile() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Ratios */}
+          {activeTab === 'ratios' && (
+            <div className="space-y-5">
+              <div className="flex justify-end">
+                <button
+                  onClick={fetchRatios}
+                  disabled={ratiosLoading}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-medium transition-all disabled:opacity-60"
+                >
+                  {ratiosLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                  {ratios ? 'Refresh Ratios' : 'Load Financial Ratios'}
+                </button>
+              </div>
+
+              {ratiosError && (
+                <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">{ratiosError}</div>
+              )}
+
+              {ratiosLoading && !ratios && (
+                <div className="h-48 flex items-center justify-center">
+                  <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+                </div>
+              )}
+
+              {!ratios && !ratiosLoading && !ratiosError && (
+                <div className="text-center py-16 text-slate-400">
+                  <PieChart className="w-12 h-12 mx-auto mb-4 text-slate-600" />
+                  <p className="text-sm">Load AI-computed financial ratios pulled from SEC XBRL data and live market prices.</p>
+                  <p className="text-xs mt-2 text-slate-500">Includes P/E, P/B, Net Margin, ROE, ROA, Current Ratio, Debt/Equity and more.</p>
+                </div>
+              )}
+
+              {ratios && !ratiosLoading && (
+                <div className="rounded-2xl bg-slate-900 border border-violet-400/10 p-6">
+                  <div className="prose prose-invert prose-sm max-w-none
+                    [&_h1]:text-violet-300 [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-4
+                    [&_h2]:text-violet-200 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mb-3 [&_h2]:mt-6
+                    [&_h3]:text-slate-200 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4
+                    [&_p]:text-slate-300 [&_p]:leading-relaxed [&_p]:mb-3
+                    [&_strong]:text-white [&_strong]:font-semibold
+                    [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_ul]:text-slate-300
+                    [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1 [&_ol]:text-slate-300
+                    [&_li]:text-slate-300 [&_li]:leading-relaxed
+                    [&_table]:w-full [&_table]:border-collapse [&_table]:text-sm
+                    [&_th]:bg-violet-500/10 [&_th]:text-violet-300 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:border [&_th]:border-slate-700
+                    [&_td]:px-3 [&_td]:py-2 [&_td]:text-slate-300 [&_td]:border [&_td]:border-slate-700 [&_tr:nth-child(even)_td]:bg-slate-800/40
+                    [&_code]:bg-slate-800 [&_code]:text-violet-300 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs
+                    [&_blockquote]:border-l-4 [&_blockquote]:border-violet-500/50 [&_blockquote]:pl-4 [&_blockquote]:text-slate-400 [&_blockquote]:italic">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{ratios.result || ''}</ReactMarkdown>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-4">Source: SEC XBRL + Finnhub live price. Computed by Finvest AI.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Trends */}
+          {activeTab === 'trends' && (
+            <div className="space-y-5">
+              {/* Controls */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex-1 min-w-48">
+                  <label className="block text-xs text-slate-400 mb-1.5">Metric</label>
+                  <select
+                    value={trendMetric}
+                    onChange={(e) => setTrendMetric(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  >
+                    {[
+                      { value: 'revenue', label: 'Revenue' },
+                      { value: 'net income', label: 'Net Income' },
+                      { value: 'gross profit', label: 'Gross Profit' },
+                      { value: 'operating income', label: 'Operating Income' },
+                      { value: 'eps', label: 'EPS (Basic)' },
+                      { value: 'total assets', label: 'Total Assets' },
+                      { value: 'total liabilities', label: 'Total Liabilities' },
+                      { value: 'stockholders equity', label: "Stockholders' Equity" },
+                      { value: 'operating cash flow', label: 'Operating Cash Flow' },
+                      { value: 'capex', label: 'CapEx' },
+                      { value: 'r&d', label: 'R&D Expense' },
+                    ].map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="w-28">
+                  <label className="block text-xs text-slate-400 mb-1.5">Years Back</label>
+                  <select
+                    value={trendYears}
+                    onChange={(e) => setTrendYears(Number(e.target.value))}
+                    className="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  >
+                    {[3, 5, 7, 10].map((n) => (
+                      <option key={n} value={n}>{n} years</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <button
+                    onClick={() => fetchTrend(trendMetric, trendYears)}
+                    disabled={trendLoading}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-medium transition-all disabled:opacity-60"
+                  >
+                    {trendLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TrendingUp className="w-4 h-4" />}
+                    {trend ? 'Update' : 'Load Trend'}
+                  </button>
+                </div>
+              </div>
+
+              {trendError && (
+                <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">{trendError}</div>
+              )}
+
+              {trendLoading && !trend && (
+                <div className="h-48 flex items-center justify-center">
+                  <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+                </div>
+              )}
+
+              {!trend && !trendLoading && !trendError && (
+                <div className="text-center py-16 text-slate-400">
+                  <TrendingUp className="w-12 h-12 mx-auto mb-4 text-slate-600" />
+                  <p className="text-sm">Select a metric and load multi-year historical data from SEC XBRL filings.</p>
+                  <p className="text-xs mt-2 text-slate-500">Includes YoY change % and CAGR computation.</p>
+                </div>
+              )}
+
+              {trend && !trendLoading && (
+                <div className="rounded-2xl bg-slate-900 border border-violet-400/10 p-6">
+                  <div className="prose prose-invert prose-sm max-w-none
+                    [&_h1]:text-violet-300 [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-4
+                    [&_h2]:text-violet-200 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mb-3 [&_h2]:mt-6
+                    [&_h3]:text-slate-200 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4
+                    [&_p]:text-slate-300 [&_p]:leading-relaxed [&_p]:mb-3
+                    [&_strong]:text-white [&_strong]:font-semibold
+                    [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_ul]:text-slate-300
+                    [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1 [&_ol]:text-slate-300
+                    [&_li]:text-slate-300 [&_li]:leading-relaxed
+                    [&_table]:w-full [&_table]:border-collapse [&_table]:text-sm
+                    [&_th]:bg-violet-500/10 [&_th]:text-violet-300 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:border [&_th]:border-slate-700
+                    [&_td]:px-3 [&_td]:py-2 [&_td]:text-slate-300 [&_td]:border [&_td]:border-slate-700 [&_tr:nth-child(even)_td]:bg-slate-800/40
+                    [&_code]:bg-slate-800 [&_code]:text-violet-300 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs
+                    [&_blockquote]:border-l-4 [&_blockquote]:border-violet-500/50 [&_blockquote]:pl-4 [&_blockquote]:text-slate-400 [&_blockquote]:italic">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{trend.result || ''}</ReactMarkdown>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-4">Source: SEC XBRL annual 10-K filings. Computed by Finvest AI.</p>
+                </div>
+              )}
             </div>
           )}
 
