@@ -6,6 +6,8 @@ import { motion } from 'framer-motion';
 import { Building2, FileText, MessageSquare, Activity, Plus, ArrowRight, Loader2 } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/authenticate';
 import OnboardingModal from '@/components/OnboardingModal';
+import { useAuth } from '@/context/AuthContext';
+import toast from 'react-hot-toast';
 
 const containerVariants = {
   hidden: {},
@@ -22,10 +24,10 @@ export default function DashboardPage() {
   const [recentCompanies, setRecentCompanies] = useState([]);
   const [recentSessions, setRecentSessions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState('');
+  const { user } = useAuth();
+  const userName = user?.userName || '';
 
   useEffect(() => {
-    setUserName(localStorage.getItem('userName') || '');
     fetchDashboardData();
   }, []);
 
@@ -39,6 +41,10 @@ export default function DashboardPage() {
       const companies = companiesRes.ok ? await companiesRes.json() : [];
       const sessions = sessionsRes.ok ? await sessionsRes.json() : [];
 
+      if (!companiesRes.ok || !sessionsRes.ok) {
+        toast.error('Some dashboard data failed to load');
+      }
+
       // Compute stats
       const totalDocs = companies.reduce((acc, c) => acc + (c.documentCount || 0), 0);
       setStats({
@@ -50,6 +56,7 @@ export default function DashboardPage() {
       setRecentSessions(sessions.slice(0, 4));
     } catch (err) {
       console.error('Dashboard fetch error:', err);
+      toast.error('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }

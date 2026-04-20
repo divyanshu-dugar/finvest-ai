@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import RouteGuard from "@/components/RouteGuard";
+import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "react-hot-toast";
 
 const geistSans = Geist({
@@ -23,12 +24,14 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <RouteGuard>
-          <Navbar />
-          <main className="min-h-screen">
-            {children}
-          </main>
-        </RouteGuard>
+        <AuthProvider>
+          <RouteGuard>
+            <Navbar />
+            <main className="min-h-screen">
+              {children}
+            </main>
+          </RouteGuard>
+        </AuthProvider>
         <Toaster
           position="top-right"
           toastOptions={{

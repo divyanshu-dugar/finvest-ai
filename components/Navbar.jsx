@@ -21,12 +21,14 @@ import {
   Layers,
   TableProperties,
 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 const navGroups = [
   {
     label: 'Researchify',
     icon: Building2,
     items: [
+      { label: 'SEC Explorer', href: '/explore', icon: Brain },
       { label: 'My Companies', href: '/companies/list', icon: List },
       { label: 'Add Company', href: '/companies/add', icon: Plus },
       { label: 'Documents', href: '/documents', icon: FileText },
@@ -47,11 +49,13 @@ export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [openGroup, setOpenGroup] = useState(null);
   const [scrolled, setScrolled] = useState(false);
-  const [userName, setUserName] = useState('');
+  const { user, logout: authLogout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   const isPublicPage = ['/', '/login', '/register'].includes(pathname);
+  const isLoggedIn = !!user;
+  const userName = user?.userName || '';
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -59,19 +63,11 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  useEffect(() => {
-    const name = localStorage.getItem('userName');
-    if (name) setUserName(name);
-  }, [pathname]);
-
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('userName');
+    authLogout();
     router.push('/');
     setIsOpen(false);
   };
-
-  const isLoggedIn = typeof window !== 'undefined' && !!localStorage.getItem('token');
 
   return (
     <nav

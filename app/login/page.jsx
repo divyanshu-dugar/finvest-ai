@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Brain, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 export default function LoginPage() {
   const [form, setForm] = useState({ userName: '', password: '' });
@@ -12,6 +13,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
+  const { login } = useAuth();
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -30,8 +32,7 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Login failed');
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('userName', data.userName);
+      login(data.token, data.userName);
       router.push('/dashboard');
     } catch (err) {
       setError(err.message);
