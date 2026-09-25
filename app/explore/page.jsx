@@ -247,17 +247,39 @@ function LeftPanel({ onCompanySelect, onFilingSelect, companyInfo, filings, sele
 function CenterPanel({ companyInfo, selectedFiling, filingContent, loadingContent }) {
   const [viewMode, setViewMode] = useState('iframe'); // 'iframe' | 'text'
   const [iframeError, setIframeError] = useState(false);
+  const [filingHtml, setFilingHtml] = useState(null);
+  const [loadingHtml, setLoadingHtml] = useState(false);
+
+  const cik = companyInfo ? companyInfo.cikRaw || parseInt(companyInfo.cik) : null;
 
   // Build SEC URL for the filing
-  const secUrl = selectedFiling && companyInfo
-    ? `https://www.sec.gov/Archives/edgar/data/${companyInfo.cikRaw || parseInt(companyInfo.cik)}/${selectedFiling.accessionClean}/${selectedFiling.primaryDocument}`
+  const secUrl = selectedFiling && cik
+    ? `https://www.sec.gov/Archives/edgar/data/${cik}/${selectedFiling.accessionClean}/${selectedFiling.primaryDocument}`
     : null;
 
-  // Reset iframe error when filing changes
+  // sec.gov sends X-Frame-Options: SAMEORIGIN, so it can't be iframed directly.
+  // Fetch the filing HTML through our API and render it via a sandboxed srcDoc instead.
   useEffect(() => {
     setIframeError(false);
     setViewMode('iframe');
-  }, [selectedFiling?.accessionNumber]);
+    setFilingHtml(null);
+    if (!selectedFiling || !cik) return;
+
+    let cancelled = false;
+    setLoadingHtml(true);
+    authenticatedFetch(
+      `${API_URL}/companies/sec/filing-html/${cik}/${selectedFiling.accessionNumber}?doc=${encodeURIComponent(selectedFiling.primaryDocument)}`
+    )
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.text();
+      })
+      .then((html) => { if (!cancelled) setFilingHtml(html); })
+      .catch(() => { if (!cancelled) setIframeError(true); })
+      .finally(() => { if (!cancelled) setLoadingHtml(false); });
+
+    return () => { cancelled = true; };
+  }, [selectedFiling?.accessionNumber, cik]);
 
   if (!selectedFiling) {
     return (
@@ -349,15 +371,20 @@ function CenterPanel({ companyInfo, selectedFiling, filingContent, loadingConten
 
       {/* Content area */}
       <div className="flex-1 overflow-hidden">
-        {viewMode === 'iframe' && secUrl && !iframeError ? (
+        {viewMode === 'iframe' && !iframeError && loadingHtml ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3">
+            <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+            <p className="text-sm text-slate-400">Loading filing…</p>
+          </div>
+        ) : viewMode === 'iframe' && filingHtml && !iframeError ? (
           <div className="relative w-full h-full">
+            {/* No allow-scripts / allow-same-origin: the filing is rendered as inert, isolated HTML */}
             <iframe
-              key={secUrl}
-              src={secUrl}
-              className="w-full h-full border-0"
+              key={selectedFiling.accessionNumber}
+              srcDoc={filingHtml}
+              className="w-full h-full border-0 bg-white"
               title={`${selectedFiling.form} Filing`}
-              onError={() => setIframeError(true)}
-              sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+              sandbox="allow-popups allow-popups-to-escape-sandbox"
             />
             {/* Iframe notice banner */}
             <div className="absolute bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-sm border-t border-slate-800 px-4 py-2 flex items-center gap-2">
@@ -379,7 +406,7 @@ function CenterPanel({ companyInfo, selectedFiling, filingContent, loadingConten
               <div className="flex items-center gap-2 mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
                 <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
                 <p className="text-xs text-amber-300">
-                  Live view blocked by SEC.gov — showing text version.{' '}
+                  Live view unavailable for this filing — showing text version.{' '}
                   <a href={secUrl} target="_blank" rel="noopener noreferrer" className="underline">
                     Open on SEC.gov ↗
                   </a>
@@ -426,7 +453,7 @@ function RightPanel({ companyInfo, selectedFiling, filingContent, savedCompany, 
   const inputRef = useRef(null);
   const router = useRouter();
 
-  const isDisabled = !filingContent;
+  const isDisabled = !filingContent?.textContent;
 
   // Clear chat when filing changes
   useEffect(() => {
@@ -438,7 +465,7 @@ function RightPanel({ companyInfo, selectedFiling, filingContent, savedCompany, 
   }, [messages, thinking]);
 
   const sendMessage = async (question) => {
-    if (!question.trim() || !filingContent || thinking) return;
+    if (!question.trim() || !filingContent?.textContent || thinking) return;
     const q = question.trim();
     setMessages((prev) => [...prev, { role: 'user', content: q }]);
     setInput('');
@@ -458,8 +485,8 @@ function RightPanel({ companyInfo, selectedFiling, filingContent, savedCompany, 
         }),
       });
 
-      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
       setMessages((prev) => [...prev, { role: 'assistant', content: data.answer }]);
     } catch (err) {
       setMessages((prev) => [...prev, {
@@ -587,7 +614,11 @@ function RightPanel({ companyInfo, selectedFiling, filingContent, savedCompany, 
             <div className="w-12 h-12 rounded-2xl bg-slate-800/60 flex items-center justify-center mb-3">
               <MessageSquare className="w-6 h-6 text-slate-600" />
             </div>
-            <p className="text-sm text-slate-500">Select a filing to start asking questions about it</p>
+            <p className="text-sm text-slate-500">
+              {filingContent
+                ? 'No readable text could be extracted from this filing, so AI chat is unavailable'
+                : 'Select a filing to start asking questions about it'}
+            </p>
           </div>
         ) : (
           <div className="p-4 space-y-3">
