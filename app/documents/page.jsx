@@ -362,6 +362,9 @@ export default function DocumentsPage() {
                       </a>
                     )}
                   </div>
+                  {doc.status === 'failed' && doc.excerpt && (
+                    <div className="text-xs text-red-400/80 mt-1 truncate" title={doc.excerpt}>{doc.excerpt}</div>
+                  )}
                 </div>
                 <StatusBadge status={doc.status} />
                 <button
