@@ -130,15 +130,20 @@ function MessageBubble({ message }) {
           </div>
         )}
 
-        {/* Copy button */}
+        {/* Always-visible per-message disclaimer + copy. We keep it understated
+            (single line, slate-500) because heavy banners on every bubble get
+            tuned out — but it must always be visible, never a tooltip. */}
         {!isUser && (
-          <button
-            onClick={handleCopy}
-            className="mt-1.5 opacity-0 group-hover:opacity-100 flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-all"
-          >
-            {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
-            {copied ? 'Copied' : 'Copy'}
-          </button>
+          <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500">
+            <span>AI-generated • verify before relying on it</span>
+            <button
+              onClick={handleCopy}
+              className="ml-auto opacity-0 group-hover:opacity-100 flex items-center gap-1 hover:text-slate-300 transition-all"
+            >
+              {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
         )}
       </div>
 

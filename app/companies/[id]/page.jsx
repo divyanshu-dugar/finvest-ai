@@ -10,7 +10,43 @@ import {
   ArrowLeft, Building2, FileText, MessageSquare, BarChart3,
   Globe, Edit2, Loader2, Plus, ExternalLink, RefreshCw,
   TrendingUp, TrendingDown, AlertTriangle, Lightbulb, PieChart,
+  Info, Upload,
 } from 'lucide-react';
+
+// Reusable disclaimer shown above any AI-generated content that isn't backed by
+// a deterministic tool call. Keep it always visible — no tooltip — so users
+// never miss it. Trust > features.
+function AIDisclaimer({ children }) {
+  return (
+    <div className="flex items-start gap-2 mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-400/30 text-amber-200 text-xs leading-relaxed">
+      <Info className="w-4 h-4 shrink-0 mt-0.5" />
+      <div>
+        <span className="font-semibold">AI-generated.</span>{' '}
+        {children || 'Verify against the underlying filing before relying on it. Not investment advice.'}
+      </div>
+    </div>
+  );
+}
+
+// Empty state for when the backend says it has no documents to ground from.
+function InsufficientDataCard({ message, companyId }) {
+  return (
+    <div className="p-6 rounded-2xl bg-slate-900 border border-slate-700 text-slate-300 text-sm leading-relaxed">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-amber-400" />
+        <div className="space-y-3">
+          <p>{message}</p>
+          <Link
+            href={`/documents?companyId=${companyId}`}
+            className="inline-flex items-center gap-1.5 text-violet-400 hover:text-violet-300 text-sm font-medium"
+          >
+            <Upload className="w-4 h-4" /> Upload a document
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
 import { authenticatedFetch } from '@/lib/authenticate';
 import {
   ResponsiveContainer,
@@ -51,7 +87,7 @@ export default function CompanyProfile() {
   const [documents, setDocuments] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [swot, setSwot] = useState(null);
-  const [summary, setSummary] = useState('');
+  const [summary, setSummary] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [swotLoading, setSwotLoading] = useState(false);
@@ -232,7 +268,12 @@ export default function CompanyProfile() {
         body: JSON.stringify({ companyId: id, companyName: company.name }),
       });
       const data = await res.json();
-      if (res.ok) setSwot(data.swot || data);
+      if (res.ok) {
+        // The backend now returns { swot: { ...bullets..., insufficient_data?, message?,
+        //   evidence_counts? } } — pass the whole thing through so the tab can render
+        //   the empty state when there are no source documents.
+        setSwot(data.swot || data);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -248,7 +289,11 @@ export default function CompanyProfile() {
         body: JSON.stringify({ companyId: id, companyName: company.name }),
       });
       const data = await res.json();
-      if (res.ok) setSummary(data.summary || data.answer || '');
+      if (res.ok) {
+        // Store the full payload so the UI can show the insufficient_data empty state
+        // when the backend reports zero indexed documents.
+        setSummary(data);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -826,13 +871,30 @@ export default function CompanyProfile() {
                   <BarChart3 className="w-12 h-12 mx-auto mb-3 text-slate-600" />
                   <p>Click &ldquo;Generate SWOT&rdquo; to create an AI-powered SWOT analysis from the indexed documents.</p>
                 </div>
+              ) : swot.insufficient_data ? (
+                <InsufficientDataCard
+                  message={swot.message || `We don't have indexed documents for ${company?.name || 'this company'} yet. Upload a 10-K or annual report to enable SWOT analysis.`}
+                  companyId={id}
+                />
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <SWOTCard category="Strengths" items={swot.strengths} icon={TrendingUp} color="border-green-500/30 text-green-400" />
-                  <SWOTCard category="Weaknesses" items={swot.weaknesses} icon={TrendingDown} color="border-red-500/30 text-red-400" />
-                  <SWOTCard category="Opportunities" items={swot.opportunities} icon={Lightbulb} color="border-blue-500/30 text-blue-400" />
-                  <SWOTCard category="Threats" items={swot.threats} icon={AlertTriangle} color="border-yellow-500/30 text-yellow-400" />
-                </div>
+                <>
+                  <AIDisclaimer>
+                    Generated from your uploaded documents only. Each bullet is cited [Source: …] —
+                    cross-check against the original filing before relying on it. Not investment advice.
+                  </AIDisclaimer>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <SWOTCard category="Strengths" items={swot.strengths} icon={TrendingUp} color="border-green-500/30 text-green-400" />
+                    <SWOTCard category="Weaknesses" items={swot.weaknesses} icon={TrendingDown} color="border-red-500/30 text-red-400" />
+                    <SWOTCard category="Opportunities" items={swot.opportunities} icon={Lightbulb} color="border-blue-500/30 text-blue-400" />
+                    <SWOTCard category="Threats" items={swot.threats} icon={AlertTriangle} color="border-yellow-500/30 text-yellow-400" />
+                  </div>
+                  {swot.summary && (
+                    <div className="mt-4 p-4 rounded-xl bg-slate-900 border border-violet-400/10 text-slate-300 text-sm leading-relaxed">
+                      <span className="text-slate-500 text-xs uppercase tracking-wide block mb-1">Overall</span>
+                      {swot.summary}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -855,10 +917,24 @@ export default function CompanyProfile() {
                   <MessageSquare className="w-12 h-12 mx-auto mb-3 text-slate-600" />
                   <p>Click &ldquo;Generate Summary&rdquo; to create an AI executive summary from the indexed documents.</p>
                 </div>
+              ) : summary.insufficient_data ? (
+                <InsufficientDataCard
+                  message={summary.message || `We don't have indexed documents for ${company?.name || 'this company'} yet. Upload a 10-K or annual report to enable an AI summary.`}
+                  companyId={id}
+                />
               ) : (
-                <div className="p-6 rounded-2xl bg-slate-900 border border-violet-400/10 text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
-                  {summary}
-                </div>
+                <>
+                  <AIDisclaimer>
+                    Generated from your uploaded documents only. Sections marked &ldquo;Not covered in
+                    the available documents&rdquo; mean we don&rsquo;t have evidence — we&rsquo;d rather say so
+                    than invent it. Not investment advice.
+                  </AIDisclaimer>
+                  <div className="p-6 rounded-2xl bg-slate-900 border border-violet-400/10 text-slate-300 text-sm leading-relaxed prose prose-invert prose-sm max-w-none">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {typeof summary === 'string' ? summary : (summary.summary || '')}
+                    </ReactMarkdown>
+                  </div>
+                </>
               )}
             </div>
           )}
