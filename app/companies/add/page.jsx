@@ -2,49 +2,32 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, ArrowLeft, Loader2, Search, CheckCircle, X } from 'lucide-react';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
+import { ArrowLeft, Loader2, Search, CheckCircle2, X } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/authenticate';
+import { SECTOR_NAMES } from '@/lib/sectors';
+import CompanyLogo from '@/components/company/CompanyLogo';
+import Button from '@/components/ui/Button';
+import { Card, PageContainer, PageHeader } from '@/components/ui/Card';
+import { FieldError, Input, Label, Select, Textarea } from '@/components/ui/Field';
 
-const SECTORS = [
-  'Technology', 'Healthcare', 'Financial Services', 'Consumer Discretionary',
-  'Consumer Staples', 'Energy', 'Industrials', 'Materials', 'Real Estate',
-  'Utilities', 'Communication Services', 'Other',
-];
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const EXCHANGES = ['NYSE', 'NASDAQ', 'LSE', 'TSX', 'ASX', 'Other'];
 
-const EMOJI_OPTIONS = ['🏢', '💻', '🏥', '🏦', '⚡', '🛒', '✈️', '🔬', '🛢️', '🏗️', '📡', '🌍'];
-
 const STATE_COUNTRY_MAP = {
-  'DE': 'United States', 'NY': 'United States', 'CA': 'United States',
-  'TX': 'United States', 'WA': 'United States', 'IL': 'United States',
-  'FL': 'United States', 'NV': 'United States', 'OH': 'United States',
-  'MA': 'United States', 'PA': 'United States', 'MN': 'United States',
-  'X2': 'Canada', 'X3': 'United Kingdom', 'X4': 'Germany', 'X5': 'France',
-  'X6': 'Japan', 'X7': 'Australia', 'X8': 'China', 'X9': 'Singapore',
+  X2: 'Canada', X3: 'United Kingdom', X4: 'Germany', X5: 'France',
+  X6: 'Japan', X7: 'Australia', X8: 'China', X9: 'Singapore',
 };
 
-function deriveEmoji(sector) {
-  const map = {
-    'Technology': '💻', 'Healthcare': '🏥', 'Financial Services': '🏦',
-    'Energy': '🛢️', 'Consumer Discretionary': '🛒', 'Consumer Staples': '🛒',
-    'Industrials': '🏗️', 'Materials': '🔬', 'Real Estate': '🏢',
-    'Utilities': '⚡', 'Communication Services': '📡',
-  };
-  return map[sector] || '🏢';
-}
+const EMPTY_FORM = { name: '', ticker: '', sector: '', exchange: '', description: '', website: '', country: '' };
 
 export default function AddCompanyPage() {
-  const [form, setForm] = useState({
-    name: '', ticker: '', sector: '', exchange: '',
-    description: '', website: '', country: '', color: '#8B5CF6', emoji: '🏢',
-  });
+  const [form, setForm] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Company search state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -55,12 +38,9 @@ export default function AddCompanyPage() {
   const debounceTimer = useRef(null);
   const router = useRouter();
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handler = (e) => {
-      if (searchRef.current && !searchRef.current.contains(e.target)) {
-        setShowDropdown(false);
-      }
+      if (searchRef.current && !searchRef.current.contains(e.target)) setShowDropdown(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -71,13 +51,15 @@ export default function AddCompanyPage() {
     setSearchQuery(value);
     setShowDropdown(true);
     clearTimeout(debounceTimer.current);
-    if (!value.trim()) { setSearchResults([]); setSearching(false); return; }
+    if (!value.trim()) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
     setSearching(true);
     debounceTimer.current = setTimeout(async () => {
       try {
-        const res = await authenticatedFetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/companies/sec/search?q=${encodeURIComponent(value)}`
-        );
+        const res = await authenticatedFetch(`${API_URL}/companies/sec/search?q=${encodeURIComponent(value)}`);
         const data = await res.json();
         setSearchResults(Array.isArray(data) ? data : []);
       } catch {
@@ -93,25 +75,19 @@ export default function AddCompanyPage() {
     setSearchQuery(`${company.name} (${company.ticker})`);
     setFillingDetails(true);
     try {
-      const res = await authenticatedFetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/companies/sec/details/${company.cik}`
-      );
+      const res = await authenticatedFetch(`${API_URL}/companies/sec/details/${company.cik}`);
       const d = await res.json();
-      const sector = d.sector || '';
-      setForm((prev) => ({
-        ...prev,
+      setForm({
         name: d.name || company.name,
         ticker: d.ticker || company.ticker,
-        sector,
+        sector: d.sector || '',
         exchange: d.exchange || '',
-        description: d.sicDescription ? `${d.name} — ${d.sicDescription}` : prev.description,
-        website: d.website ? (d.website.startsWith('http') ? d.website : `https://${d.website}`) : prev.website,
-        country: STATE_COUNTRY_MAP[d.stateOfIncorporation] || (d.stateOfIncorporation ? 'United States' : prev.country),
-        emoji: deriveEmoji(sector),
-      }));
+        description: d.sicDescription ? `${d.name}. ${d.sicDescription}.` : '',
+        website: d.website ? (d.website.startsWith('http') ? d.website : `https://${d.website}`) : '',
+        country: STATE_COUNTRY_MAP[d.stateOfIncorporation] || (d.stateOfIncorporation ? 'United States' : ''),
+      });
       setAutoFilled(true);
     } catch {
-      // partial fill from search result
       setForm((prev) => ({ ...prev, name: company.name, ticker: company.ticker }));
     } finally {
       setFillingDetails(false);
@@ -121,7 +97,7 @@ export default function AddCompanyPage() {
   const clearAutoFill = () => {
     setSearchQuery('');
     setAutoFilled(false);
-    setForm({ name: '', ticker: '', sector: '', exchange: '', description: '', website: '', country: '', color: '#8B5CF6', emoji: '🏢' });
+    setForm(EMPTY_FORM);
   };
 
   const handleChange = (e) => {
@@ -134,270 +110,141 @@ export default function AddCompanyPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/companies`, {
+      const res = await authenticatedFetch(`${API_URL}/companies`, {
         method: 'POST',
         body: JSON.stringify(form),
       });
       const data = await res.json();
+      if (res.status === 409 && data.company) {
+        toast(data.message);
+        router.push(`/companies/${data.company._id}`);
+        return;
+      }
       if (!res.ok) throw new Error(data.message || 'Failed to add company');
-      router.push(`/companies/${data._id}`);
+      router.push(`/companies/${data.company._id}`);
     } catch (err) {
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 pt-20 pb-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl mx-auto">
-        <Link
-          href="/companies/list"
-          className="inline-flex items-center gap-2 text-slate-400 hover:text-violet-400 text-sm mb-6 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to Companies
-        </Link>
+    <PageContainer size="md">
+      <Link href="/companies/list" className="mb-5 inline-flex items-center gap-1.5 text-[13px] font-medium text-muted hover:text-ink">
+        <ArrowLeft className="size-4" /> Companies
+      </Link>
+      <PageHeader title="Add a company" description="Create a research workspace for a public company." />
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-slate-900 border border-violet-400/20 rounded-2xl p-8"
-        >
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-linear-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white">Add Company</h1>
-              <p className="text-slate-400 text-sm">Create a research workspace for a company</p>
-            </div>
-          </div>
-
-          {/* ── SEC Company Search ── */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Search Company <span className="text-slate-500 font-normal">(optional — auto-fills the form)</span>
-            </label>
-            <div ref={searchRef} className="relative">
-              <div className="relative flex items-center">
-                <Search className="absolute left-3.5 w-4 h-4 text-slate-500 pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={handleSearchChange}
-                  onFocus={() => searchQuery.trim() && setShowDropdown(true)}
-                  placeholder="Search by company name or ticker, e.g. Apple or AAPL…"
-                  className="w-full pl-10 pr-10 py-3 rounded-xl bg-slate-800 border border-violet-500/40 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50 transition-colors text-sm"
-                />
-                {(searching || fillingDetails) && (
-                  <Loader2 className="absolute right-3.5 w-4 h-4 text-violet-400 animate-spin" />
-                )}
-                {autoFilled && !fillingDetails && (
-                  <button type="button" onClick={clearAutoFill} className="absolute right-3.5 text-slate-500 hover:text-slate-300">
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-
-              <AnimatePresence>
-                {showDropdown && searchResults.length > 0 && (
-                  <motion.ul
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: 0.12 }}
-                    className="absolute z-50 w-full mt-1.5 bg-slate-800 border border-slate-700 rounded-xl shadow-xl overflow-hidden"
-                  >
-                    {searchResults.map((company) => (
-                      <li key={company.cik}>
-                        <button
-                          type="button"
-                          onMouseDown={() => handleSelectCompany(company)}
-                          className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-violet-500/10 text-left transition-colors"
-                        >
-                          <span className="text-white text-sm font-medium truncate">{company.name}</span>
-                          <span className="ml-3 shrink-0 text-xs font-mono text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded">
-                            {company.ticker}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </motion.ul>
-                )}
-                {showDropdown && !searching && searchQuery.trim() && searchResults.length === 0 && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute z-50 w-full mt-1.5 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-500"
-                  >
-                    No results found. Fill the form manually below.
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {autoFilled && (
-              <motion.div
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-2 flex items-center gap-1.5 text-xs text-emerald-400"
+      <Card className="p-6 sm:p-7">
+        <div ref={searchRef} className="relative">
+          <Label htmlFor="company-search" hint="Fills in the form from SEC EDGAR">Find a company</Label>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-faint" />
+            <Input
+              id="company-search"
+              value={searchQuery}
+              onChange={handleSearchChange}
+              onFocus={() => searchQuery.trim() && setShowDropdown(true)}
+              placeholder="Company name or ticker, for example Apple or AAPL"
+              className="pl-9 pr-10"
+              autoComplete="off"
+            />
+            {(searching || fillingDetails) && (
+              <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted" />
+            )}
+            {autoFilled && !fillingDetails && (
+              <button
+                type="button"
+                onClick={clearAutoFill}
+                aria-label="Clear"
+                className="absolute right-1.5 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted hover:bg-subtle hover:text-ink"
               >
-                <CheckCircle className="w-3.5 h-3.5" />
-                Auto-filled from SEC EDGAR — review and edit as needed
-              </motion.div>
+                <X className="size-4" />
+              </button>
             )}
           </div>
 
-          <div className="border-t border-slate-800 mb-5" />
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Name + Ticker */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Company Name *</label>
-                <input
-                  type="text"
-                  name="name"
-                  value={form.name}
-                  onChange={handleChange}
-                  placeholder="Apple Inc."
-                  required
-                  className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50 transition-colors text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Ticker Symbol</label>
-                <input
-                  type="text"
-                  name="ticker"
-                  value={form.ticker}
-                  onChange={handleChange}
-                  placeholder="AAPL"
-                  className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50 transition-colors text-sm uppercase"
-                />
-              </div>
-            </div>
-
-            {/* Sector + Exchange */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Sector</label>
-                <select
-                  name="sector"
-                  value={form.sector}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50 transition-colors text-sm"
-                >
-                  <option value="">Select sector</option>
-                  {SECTORS.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Exchange</label>
-                <select
-                  name="exchange"
-                  value={form.exchange}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50 transition-colors text-sm"
-                >
-                  <option value="">Select exchange</option>
-                  {EXCHANGES.map((e) => <option key={e} value={e}>{e}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {/* Country + Website */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Country</label>
-                <input
-                  type="text"
-                  name="country"
-                  value={form.country}
-                  onChange={handleChange}
-                  placeholder="United States"
-                  className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50 transition-colors text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Website</label>
-                <input
-                  type="url"
-                  name="website"
-                  value={form.website}
-                  onChange={handleChange}
-                  placeholder="https://apple.com"
-                  className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50 transition-colors text-sm"
-                />
-              </div>
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">Description</label>
-              <textarea
-                name="description"
-                value={form.description}
-                onChange={handleChange}
-                placeholder="Brief description of the company..."
-                rows={3}
-                className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50 transition-colors text-sm resize-none"
-              />
-            </div>
-
-            {/* Emoji + Color */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Emoji</label>
-                <div className="flex flex-wrap gap-2">
-                  {EMOJI_OPTIONS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => setForm({ ...form, emoji })}
-                      className={`w-9 h-9 text-lg rounded-lg border transition-all ${
-                        form.emoji === emoji
-                          ? 'border-violet-500 bg-violet-500/20'
-                          : 'border-slate-700 bg-slate-800 hover:border-violet-400/50'
-                      }`}
-                    >
-                      {emoji}
-                    </button>
+          {showDropdown && searchQuery.trim() && !searching && (
+            <div className="absolute z-20 mt-1.5 w-full overflow-hidden rounded-xl border border-line bg-surface shadow-pop animate-fade-up">
+              {searchResults.length > 0 ? (
+                <ul className="max-h-72 overflow-y-auto py-1">
+                  {searchResults.map((company) => (
+                    <li key={company.cik}>
+                      <button
+                        type="button"
+                        onMouseDown={() => handleSelectCompany(company)}
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-canvas"
+                      >
+                        <CompanyLogo ticker={company.ticker} name={company.name} size="sm" />
+                        <span className="min-w-0 flex-1 truncate text-sm text-ink">{company.name}</span>
+                        <span className="font-mono text-xs text-muted">{company.ticker}</span>
+                      </button>
+                    </li>
                   ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Card Color</label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    name="color"
-                    value={form.color}
-                    onChange={handleChange}
-                    className="w-10 h-10 rounded-lg cursor-pointer bg-slate-800 border border-slate-700"
-                  />
-                  <span className="text-sm text-slate-400">{form.color}</span>
-                </div>
-              </div>
+                </ul>
+              ) : (
+                <p className="px-4 py-3 text-[13px] text-muted">No matches. Fill in the details below instead.</p>
+              )}
             </div>
+          )}
 
-            {error && (
-              <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-                {error}
-              </p>
-            )}
+          {autoFilled && (
+            <p className="mt-2 flex items-center gap-1.5 text-xs text-positive">
+              <CheckCircle2 className="size-3.5" />
+              Filled in from SEC EDGAR. Review before saving.
+            </p>
+          )}
+        </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 rounded-xl font-semibold text-white bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/20 flex items-center justify-center gap-2"
-            >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Add Company'}
-            </button>
-          </form>
-        </motion.div>
-      </div>
-    </div>
+        <div className="my-6 border-t border-line" />
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="name">Company name</Label>
+              <Input id="name" name="name" value={form.name} onChange={handleChange} placeholder="Apple Inc." required />
+            </div>
+            <div>
+              <Label htmlFor="ticker">Ticker</Label>
+              <Input id="ticker" name="ticker" value={form.ticker} onChange={handleChange} placeholder="AAPL" className="font-mono uppercase" />
+            </div>
+            <div>
+              <Label htmlFor="sector">Sector</Label>
+              <Select id="sector" name="sector" value={form.sector} onChange={handleChange}>
+                <option value="">Select a sector</option>
+                {SECTOR_NAMES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="exchange">Exchange</Label>
+              <Select id="exchange" name="exchange" value={form.exchange} onChange={handleChange}>
+                <option value="">Select an exchange</option>
+                {EXCHANGES.map((x) => <option key={x} value={x}>{x}</option>)}
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="country">Country</Label>
+              <Input id="country" name="country" value={form.country} onChange={handleChange} placeholder="United States" />
+            </div>
+            <div>
+              <Label htmlFor="website">Website</Label>
+              <Input id="website" name="website" type="url" value={form.website} onChange={handleChange} placeholder="https://apple.com" />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="description" hint="Optional">Description</Label>
+            <Textarea id="description" name="description" value={form.description} onChange={handleChange} rows={3} className="resize-none" />
+          </div>
+
+          <FieldError>{error}</FieldError>
+
+          <div className="flex justify-end gap-2 pt-1">
+            <Button href="/companies/list" variant="secondary">Cancel</Button>
+            <Button type="submit" loading={loading}>Add company</Button>
+          </div>
+        </form>
+      </Card>
+    </PageContainer>
   );
 }

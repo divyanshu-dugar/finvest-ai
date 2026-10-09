@@ -2,66 +2,54 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import toast from 'react-hot-toast';
 import {
-  Search, Building2, FileText, ChevronRight, ExternalLink,
-  Loader2, Send, BookmarkPlus, MessageSquare, Sparkles,
-  X, Check, Filter, AlertCircle, Info,
+  Search, FileText, ExternalLink, Loader2, ArrowUp, BookmarkPlus, Check,
+  MessagesSquare, X, AlertCircle, FileSearch,
 } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/authenticate';
+import { formatDate } from '@/lib/format';
+import { LogoMark } from '@/components/Logo';
+import Markdown from '@/components/Markdown';
+import CompanyLogo from '@/components/company/CompanyLogo';
+import SectorBadge from '@/components/company/SectorBadge';
+import Button from '@/components/ui/Button';
+import { EmptyState } from '@/components/ui/Card';
+import { Input, Label } from '@/components/ui/Field';
+import { cn } from '@/lib/utils';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-// ─── Markdown components (matching finvest-ai dark theme) ─────────
-const markdownComponents = {
-  h1: ({ children }) => <h1 className="text-base font-bold text-white mb-2 mt-3">{children}</h1>,
-  h2: ({ children }) => <h2 className="text-sm font-bold text-violet-300 mb-2 mt-3">{children}</h2>,
-  h3: ({ children }) => <h3 className="text-sm font-semibold text-slate-200 mb-1.5 mt-2">{children}</h3>,
-  p: ({ children }) => <p className="text-sm text-slate-200 leading-relaxed mb-2">{children}</p>,
-  strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
-  em: ({ children }) => <em className="italic text-slate-300">{children}</em>,
-  ul: ({ children }) => <ul className="list-disc list-inside space-y-1 mb-2 pl-2">{children}</ul>,
-  ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 mb-2 pl-2">{children}</ol>,
-  li: ({ children }) => <li className="text-sm text-slate-200 leading-relaxed">{children}</li>,
-  code: ({ inline, children }) =>
-    inline ? (
-      <code className="text-xs font-mono bg-slate-700 text-violet-300 px-1.5 py-0.5 rounded">{children}</code>
-    ) : (
-      <pre className="text-xs font-mono bg-slate-900 text-slate-300 p-3 rounded-lg overflow-x-auto mb-2 border border-slate-700">
-        <code>{children}</code>
-      </pre>
-    ),
-  table: ({ children }) => (
-    <div className="overflow-x-auto mb-3">
-      <table className="w-full text-xs text-slate-200 border-collapse">{children}</table>
-    </div>
-  ),
-  thead: ({ children }) => <thead className="bg-slate-700/50">{children}</thead>,
-  th: ({ children }) => <th className="px-3 py-2 text-left font-semibold text-violet-300 border border-slate-600">{children}</th>,
-  td: ({ children }) => <td className="px-3 py-2 border border-slate-700">{children}</td>,
-  tr: ({ children }) => <tr className="even:bg-slate-800/30">{children}</tr>,
-  blockquote: ({ children }) => (
-    <blockquote className="border-l-2 border-violet-500 pl-3 my-2 text-sm text-slate-400 italic">{children}</blockquote>
-  ),
-  a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-300 underline">
-      {children}
-    </a>
-  ),
-};
+const MOBILE_PANELS = [
+  { id: 'filings', label: 'Filings' },
+  { id: 'document', label: 'Document' },
+  { id: 'analyst', label: 'Analyst' },
+];
 
-function formatDate(dateStr) {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+function SegmentedControl({ options, value, onChange, className }) {
+  return (
+    <div className={cn('inline-flex rounded-lg bg-subtle p-0.5', className)}>
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          onClick={() => onChange(o.id)}
+          aria-pressed={value === o.id}
+          className={cn(
+            'flex-1 rounded-md px-3 py-1 text-[13px] font-medium transition-colors',
+            value === o.id ? 'bg-surface text-ink shadow-xs' : 'text-muted hover:text-ink',
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
 }
 
-// ─── Left Panel: Company Search + Filings ─────────────────────────
-function LeftPanel({ onCompanySelect, onFilingSelect, companyInfo, filings, selectedFiling, loadingFilings }) {
+// ─── Left: company search and filings ────────────────────────────
+
+function FilingsPanel({ onCompanySelect, onFilingSelect, companyInfo, filings, selectedFiling, loadingFilings }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -82,7 +70,11 @@ function LeftPanel({ onCompanySelect, onFilingSelect, companyInfo, filings, sele
     const val = e.target.value;
     setQuery(val);
     clearTimeout(debounceRef.current);
-    if (!val.trim()) { setResults([]); setDropdownOpen(false); return; }
+    if (!val.trim()) {
+      setResults([]);
+      setDropdownOpen(false);
+      return;
+    }
     setSearching(true);
     debounceRef.current = setTimeout(async () => {
       try {
@@ -99,143 +91,112 @@ function LeftPanel({ onCompanySelect, onFilingSelect, companyInfo, filings, sele
   };
 
   const handleSelect = (company) => {
-    setQuery(`${company.ticker ? company.ticker + ' — ' : ''}${company.name}`);
+    setQuery(company.ticker ? `${company.ticker} · ${company.name}` : company.name);
     setDropdownOpen(false);
     setResults([]);
     onCompanySelect(company);
   };
 
-  const filteredFilings = filings.filter((f) => {
-    if (filter === 'all') return true;
-    return f.form === filter;
-  });
+  const visibleFilings = filter === 'all' ? filings : filings.filter((f) => f.form === filter);
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Search */}
-      <div className="p-4 border-b border-slate-800">
-        <p className="text-xs text-slate-500 mb-2 font-medium uppercase tracking-wider">SEC Explorer</p>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="border-b border-line p-4">
         <div className="relative" ref={wrapperRef}>
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input
-            type="text"
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-faint" />
+          <Input
             value={query}
             onChange={handleChange}
             onFocus={() => results.length > 0 && setDropdownOpen(true)}
-            placeholder="Search by ticker or name…"
-            className="w-full pl-9 pr-3 py-2.5 bg-slate-800/60 border border-slate-700 rounded-xl text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 transition-all"
+            placeholder="Search a company or ticker"
+            className="pl-9 pr-9"
+            aria-label="Search companies"
+            autoComplete="off"
           />
-          {searching && (
-            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-violet-400 animate-spin" />
-          )}
+          {searching && <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted" />}
 
-          <AnimatePresence>
-            {dropdownOpen && results.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                className="absolute z-50 top-full mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl shadow-xl overflow-hidden"
-              >
-                {results.map((r, i) => (
+          {dropdownOpen && results.length > 0 && (
+            <ul className="absolute z-30 mt-1.5 max-h-80 w-full overflow-y-auto rounded-xl border border-line bg-surface py-1 shadow-pop animate-fade-up">
+              {results.map((r, i) => (
+                <li key={`${r.cik}-${i}`}>
                   <button
-                    key={`${r.cik}-${i}`}
+                    type="button"
                     onClick={() => handleSelect(r)}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-700/60 transition-colors text-left"
+                    className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-canvas"
                   >
-                    <span className="text-xs font-bold text-violet-400 w-12 shrink-0">{r.ticker || '—'}</span>
-                    <span className="text-sm text-slate-200 truncate">{r.name}</span>
+                    <CompanyLogo ticker={r.ticker} name={r.name} size="sm" />
+                    <span className="min-w-0 flex-1 truncate text-sm text-ink">{r.name}</span>
+                    <span className="font-mono text-xs text-muted">{r.ticker}</span>
                   </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
 
-      {/* Company info strip */}
       {companyInfo && (
-        <div className="px-4 py-3 border-b border-slate-800 bg-slate-800/30">
-          <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-violet-400 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-white truncate">{companyInfo.name}</p>
-              <div className="flex items-center gap-2 mt-0.5">
-                {companyInfo.ticker && (
-                  <span className="text-xs font-mono text-violet-300">{companyInfo.ticker}</span>
-                )}
-                {companyInfo.exchanges?.[0] && (
-                  <span className="text-xs text-slate-500">{companyInfo.exchanges[0]}</span>
-                )}
-              </div>
+        <div className="flex items-center gap-3 border-b border-line px-4 py-3.5">
+          <CompanyLogo ticker={companyInfo.ticker} name={companyInfo.name} sector={companyInfo.sector} />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-ink">{companyInfo.name}</p>
+            <div className="mt-0.5 flex items-center gap-2">
+              {companyInfo.ticker && <span className="font-mono text-xs text-muted">{companyInfo.ticker}</span>}
+              {companyInfo.exchanges?.[0] && <span className="text-xs text-faint">{companyInfo.exchanges[0]}</span>}
             </div>
+            <SectorBadge sector={companyInfo.sector} className="mt-1.5" />
           </div>
         </div>
       )}
 
-      {/* Filings list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
         {loadingFilings ? (
-          <div className="p-4 space-y-2">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-14 bg-slate-800/40 rounded-xl animate-pulse" />
-            ))}
+          <div className="space-y-2 p-4">
+            {[...Array(6)].map((_, i) => <div key={i} className="h-14 animate-pulse rounded-lg bg-subtle" />)}
           </div>
         ) : filings.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-4 py-12">
-            <FileText className="w-8 h-8 text-slate-600 mb-3" />
-            <p className="text-sm text-slate-500">Search for a company to browse its SEC filings</p>
-          </div>
+          <EmptyState icon={FileSearch} title="No company selected" description="Search for a company to browse its 10-K and 10-Q filings." />
         ) : (
-          <div className="p-4 space-y-1">
-            {/* Filter tabs */}
-            <div className="flex items-center gap-1.5 mb-3">
-              {['all', '10-K', '10-Q'].map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={`text-xs px-3 py-1 rounded-lg font-medium transition-colors ${
-                    filter === f
-                      ? 'bg-violet-600 text-white'
-                      : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  {f === 'all' ? 'All' : f}
-                </button>
-              ))}
-              <span className="ml-auto text-xs text-slate-500">{filteredFilings.length}</span>
+          <div className="p-3">
+            <div className="mb-2 flex items-center justify-between px-1">
+              <SegmentedControl
+                options={[{ id: 'all', label: 'All' }, { id: '10-K', label: '10-K' }, { id: '10-Q', label: '10-Q' }]}
+                value={filter}
+                onChange={setFilter}
+              />
+              <span className="text-xs text-muted tabular-nums">{visibleFilings.length}</span>
             </div>
-
-            {filteredFilings.map((filing) => {
-              const isActive = selectedFiling?.accessionNumber === filing.accessionNumber;
-              const is10K = filing.form === '10-K';
-              return (
-                <button
-                  key={filing.accessionNumber}
-                  onClick={() => onFilingSelect(filing)}
-                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl border transition-all text-left ${
-                    isActive
-                      ? 'border-violet-500/50 bg-violet-500/10'
-                      : 'border-transparent hover:border-slate-700 hover:bg-slate-800/40'
-                  }`}
-                >
-                  <span
-                    className={`text-xs font-bold px-2 py-0.5 rounded-lg shrink-0 ${
-                      is10K
-                        ? 'bg-violet-500/20 text-violet-300'
-                        : 'bg-blue-500/20 text-blue-300'
-                    }`}
-                  >
-                    {filing.form}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs text-slate-200 font-medium">{formatDate(filing.filingDate)}</p>
-                    <p className="text-xs text-slate-500 truncate">Period: {formatDate(filing.reportDate)}</p>
-                  </div>
-                  {isActive && <ChevronRight className="w-3.5 h-3.5 text-violet-400 shrink-0" />}
-                </button>
-              );
-            })}
+            <ul className="space-y-0.5">
+              {visibleFilings.map((filing) => {
+                const active = selectedFiling?.accessionNumber === filing.accessionNumber;
+                return (
+                  <li key={filing.accessionNumber}>
+                    <button
+                      type="button"
+                      onClick={() => onFilingSelect(filing)}
+                      aria-current={active ? 'true' : undefined}
+                      className={cn(
+                        'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors',
+                        active ? 'bg-subtle' : 'hover:bg-canvas',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'w-11 shrink-0 rounded-md py-0.5 text-center font-mono text-[11px] font-medium',
+                          filing.form === '10-K' ? 'bg-ink text-white' : 'bg-surface text-ink-2 ring-1 ring-line',
+                        )}
+                      >
+                        {filing.form}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-[13px] font-medium text-ink">{formatDate(filing.filingDate)}</span>
+                        <span className="block truncate text-xs text-muted">Period ending {formatDate(filing.reportDate)}</span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         )}
       </div>
@@ -243,39 +204,38 @@ function LeftPanel({ onCompanySelect, onFilingSelect, companyInfo, filings, sele
   );
 }
 
-// ─── Center Panel: Filing Viewer ──────────────────────────────────
-function CenterPanel({ companyInfo, selectedFiling, filingContent, loadingContent }) {
-  const [viewMode, setViewMode] = useState('iframe'); // 'iframe' | 'text'
-  const [iframeError, setIframeError] = useState(false);
+// ─── Center: filing viewer ───────────────────────────────────────
+
+function DocumentPanel({ companyInfo, selectedFiling, filingContent, loadingContent }) {
+  const [viewMode, setViewMode] = useState('rendered');
+  const [htmlError, setHtmlError] = useState(false);
   const [filingHtml, setFilingHtml] = useState(null);
   const [loadingHtml, setLoadingHtml] = useState(false);
 
   const cik = companyInfo ? companyInfo.cikRaw || parseInt(companyInfo.cik) : null;
-
-  // Build SEC URL for the filing
   const secUrl = selectedFiling && cik
     ? `https://www.sec.gov/Archives/edgar/data/${cik}/${selectedFiling.accessionClean}/${selectedFiling.primaryDocument}`
     : null;
 
-  // sec.gov sends X-Frame-Options: SAMEORIGIN, so it can't be iframed directly.
-  // Fetch the filing HTML through our API and render it via a sandboxed srcDoc instead.
+  // sec.gov sends X-Frame-Options: SAMEORIGIN, so it can't be framed directly.
+  // The API proxies the filing HTML and we render it in a sandboxed srcDoc iframe instead.
   useEffect(() => {
-    setIframeError(false);
-    setViewMode('iframe');
+    setHtmlError(false);
+    setViewMode('rendered');
     setFilingHtml(null);
     if (!selectedFiling || !cik) return;
 
     let cancelled = false;
     setLoadingHtml(true);
     authenticatedFetch(
-      `${API_URL}/companies/sec/filing-html/${cik}/${selectedFiling.accessionNumber}?doc=${encodeURIComponent(selectedFiling.primaryDocument)}`
+      `${API_URL}/companies/sec/filing-html/${cik}/${selectedFiling.accessionNumber}?doc=${encodeURIComponent(selectedFiling.primaryDocument)}`,
     )
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.text();
       })
       .then((html) => { if (!cancelled) setFilingHtml(html); })
-      .catch(() => { if (!cancelled) setIframeError(true); })
+      .catch(() => { if (!cancelled) setHtmlError(true); })
       .finally(() => { if (!cancelled) setLoadingHtml(false); });
 
     return () => { cancelled = true; };
@@ -283,156 +243,77 @@ function CenterPanel({ companyInfo, selectedFiling, filingContent, loadingConten
 
   if (!selectedFiling) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center px-8">
-        <div className="w-16 h-16 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mb-4">
-          <FileText className="w-8 h-8 text-violet-400" />
-        </div>
-        <h2 className="text-lg font-semibold text-white mb-2">SEC Filing Analyzer</h2>
-        <p className="text-sm text-slate-400 max-w-sm leading-relaxed mb-6">
-          Search for any publicly traded US company, then select a 10-K or 10-Q filing to view it here.
-        </p>
-        <div className="space-y-2.5 text-left w-full max-w-xs">
-          {[
-            { step: '1', text: 'Search for a company by name or ticker' },
-            { step: '2', text: 'Select a filing from the list on the left' },
-            { step: '3', text: 'Read the document and ask AI questions' },
-          ].map(({ step, text }) => (
-            <div key={step} className="flex items-center gap-3">
-              <span className="w-6 h-6 rounded-full bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-xs font-bold text-violet-300 shrink-0">
-                {step}
-              </span>
-              <p className="text-xs text-slate-400">{text}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+      <EmptyState
+        icon={FileText}
+        title="Pick a filing to read"
+        description="Search for a company, choose a 10-K or 10-Q, and it opens here. The analyst on the right can answer questions about it."
+        className="h-full"
+      />
     );
   }
 
-  if (loadingContent) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-3">
-        <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
-        <p className="text-sm text-slate-400">Fetching filing from SEC EDGAR…</p>
-        <p className="text-xs text-slate-600">Large filings may take a few moments</p>
-      </div>
-    );
-  }
+  const showRendered = viewMode === 'rendered' && !htmlError;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Header bar */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 shrink-0">
-        <div className="flex items-center gap-3">
-          <span
-            className={`text-xs font-bold px-2 py-0.5 rounded-lg ${
-              selectedFiling.form === '10-K'
-                ? 'bg-violet-500/20 text-violet-300'
-                : 'bg-blue-500/20 text-blue-300'
-            }`}
-          >
-            {selectedFiling.form}
-          </span>
-          <span className="text-sm text-white font-medium">
-            {companyInfo?.name}
-          </span>
-          <span className="text-xs text-slate-500">{formatDate(selectedFiling.filingDate)}</span>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="rounded-md bg-ink px-1.5 py-0.5 font-mono text-[11px] font-medium text-white">{selectedFiling.form}</span>
+          <span className="truncate text-sm font-medium text-ink">{companyInfo?.name}</span>
+          <span className="hidden text-xs text-muted sm:inline">Filed {formatDate(selectedFiling.filingDate)}</span>
         </div>
         <div className="flex items-center gap-2">
-          {filingContent && (
-            <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-0.5">
-              <button
-                onClick={() => setViewMode('iframe')}
-                className={`text-xs px-2.5 py-1 rounded-md transition-colors ${viewMode === 'iframe' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                Live View
-              </button>
-              <button
-                onClick={() => setViewMode('text')}
-                className={`text-xs px-2.5 py-1 rounded-md transition-colors ${viewMode === 'text' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                Text View
-              </button>
-            </div>
-          )}
+          <SegmentedControl
+            options={[{ id: 'rendered', label: 'Filing' }, { id: 'text', label: 'Text' }]}
+            value={htmlError ? 'text' : viewMode}
+            onChange={setViewMode}
+          />
           {secUrl && (
-            <a
-              href={secUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 px-3 py-1.5 rounded-lg border border-violet-500/30 hover:border-violet-400/50 transition-colors"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              SEC.gov
-            </a>
+            <Button href={secUrl} target="_blank" rel="noopener noreferrer" size="sm" variant="ghost" className="gap-1">
+              SEC.gov <ExternalLink className="size-3.5" />
+            </Button>
           )}
         </div>
       </div>
 
-      {/* Content area */}
-      <div className="flex-1 overflow-hidden">
-        {viewMode === 'iframe' && !iframeError && loadingHtml ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3">
-            <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
-            <p className="text-sm text-slate-400">Loading filing…</p>
-          </div>
-        ) : viewMode === 'iframe' && filingHtml && !iframeError ? (
-          <div className="relative w-full h-full">
-            {/* No allow-scripts / allow-same-origin: the filing is rendered as inert, isolated HTML */}
-            <iframe
-              key={selectedFiling.accessionNumber}
-              srcDoc={filingHtml}
-              className="w-full h-full border-0 bg-white"
-              title={`${selectedFiling.form} Filing`}
-              sandbox="allow-popups allow-popups-to-escape-sandbox"
-            />
-            {/* Iframe notice banner */}
-            <div className="absolute bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-sm border-t border-slate-800 px-4 py-2 flex items-center gap-2">
-              <Info className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-              <p className="text-xs text-slate-500">
-                Viewing the official SEC filing — some documents may require text view. Use the <strong className="text-slate-400">AI Chat</strong> panel on the right to ask questions.
-              </p>
-              <button
-                onClick={() => setViewMode('text')}
-                className="ml-auto text-xs text-violet-400 hover:text-violet-300 shrink-0"
-              >
-                Switch to text
-              </button>
+      <div className="min-h-0 flex-1">
+        {showRendered ? (
+          loadingHtml ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3">
+              <Loader2 className="size-5 animate-spin text-muted" />
+              <p className="text-[13px] text-muted">Loading the filing from SEC EDGAR</p>
             </div>
-          </div>
+          ) : (
+            filingHtml && (
+              // No allow-scripts or allow-same-origin: the filing renders as inert, isolated HTML.
+              <iframe
+                key={selectedFiling.accessionNumber}
+                srcDoc={filingHtml}
+                title={`${selectedFiling.form} filing`}
+                sandbox="allow-popups allow-popups-to-escape-sandbox"
+                className="size-full border-0 bg-white"
+              />
+            )
+          )
         ) : (
-          <div className="h-full overflow-y-auto p-6">
-            {iframeError && (
-              <div className="flex items-center gap-2 mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-                <p className="text-xs text-amber-300">
-                  Live view unavailable for this filing — showing text version.{' '}
-                  <a href={secUrl} target="_blank" rel="noopener noreferrer" className="underline">
-                    Open on SEC.gov ↗
-                  </a>
-                </p>
+          <div className="scrollbar-thin h-full overflow-y-auto px-5 py-6 sm:px-8">
+            {htmlError && (
+              <div className="mx-auto mb-5 flex max-w-3xl items-center gap-2 rounded-lg border border-warning/20 bg-warning-soft px-3.5 py-2.5 text-[13px] text-warning">
+                <AlertCircle className="size-4 shrink-0" />
+                The formatted filing isn&apos;t available, so this is the text version.
               </div>
             )}
-            {filingContent ? (
-              <>
-                <div className="flex items-center gap-3 mb-5 pb-4 border-b border-slate-800">
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <span>{filingContent.wordCount?.toLocaleString()} words</span>
-                    <span>·</span>
-                    <span>{Math.round(filingContent.textLength / 1024)} KB</span>
-                  </div>
-                </div>
-                <div className="max-w-3xl mx-auto">
-                  <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">
-                    {filingContent.textContent}
-                  </pre>
-                </div>
-              </>
+            {loadingContent ? (
+              <div className="flex h-full items-center justify-center"><Loader2 className="size-5 animate-spin text-muted" /></div>
+            ) : filingContent?.textContent ? (
+              <article className="mx-auto max-w-3xl">
+                <p className="mb-5 text-xs text-muted tabular-nums">
+                  {filingContent.wordCount?.toLocaleString()} words · {Math.round(filingContent.textLength / 1024)} KB
+                </p>
+                <div className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-2">{filingContent.textContent}</div>
+              </article>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center">
-                <Loader2 className="w-6 h-6 text-violet-400 animate-spin mb-3" />
-                <p className="text-sm text-slate-400">Loading filing content…</p>
-              </div>
+              <EmptyState icon={FileText} title="No readable text" description="This filing has no text that could be extracted. Try the SEC.gov link." />
             )}
           </div>
         )}
@@ -441,32 +322,102 @@ function CenterPanel({ companyInfo, selectedFiling, filingContent, loadingConten
   );
 }
 
-// ─── Right Panel: AI Chat + Save Company ─────────────────────────
-function RightPanel({ companyInfo, selectedFiling, filingContent, savedCompany, onSaveCompany, savingCompany }) {
+// ─── Right: analyst chat ─────────────────────────────────────────
+
+function suggestedQuestionsFor(filing) {
+  if (!filing) return [];
+  return filing.form === '10-K'
+    ? [
+        'What are the main risk factors?',
+        'How has revenue changed over recent years?',
+        'Describe the competitive landscape.',
+        'What are the key business segments?',
+      ]
+    : [
+        'What were revenue and earnings this quarter?',
+        'How did operating income change from last year?',
+        'Were there any significant one-time items?',
+        'What does management say about the outlook?',
+      ];
+}
+
+function NewSessionDialog({ companyInfo, selectedFiling, savedCompany, onClose }) {
+  const defaultName = `${companyInfo?.name} ${selectedFiling?.form || ''} analysis`.trim();
+  const [name, setName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const router = useRouter();
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    setCreating(true);
+    try {
+      const res = await authenticatedFetch(`${API_URL}/api/research-sessions`, {
+        method: 'POST',
+        body: JSON.stringify({ sessionName: name.trim() || defaultName, companyId: savedCompany._id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not create the session');
+      router.push(`/research/${data._id}`);
+    } catch (err) {
+      toast.error(err.message);
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-ink/30 backdrop-blur-[2px] animate-fade-up" onClick={onClose} />
+      <form
+        onSubmit={handleCreate}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-session-title"
+        className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-6 shadow-pop animate-fade-up"
+      >
+        <div className="flex items-center justify-between">
+          <h2 id="new-session-title" className="font-display text-lg font-medium text-ink">New research session</h2>
+          <button type="button" onClick={onClose} aria-label="Close" className="flex size-8 items-center justify-center rounded-lg text-muted hover:bg-subtle hover:text-ink">
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="mt-5">
+          <Label htmlFor="session-name">Name</Label>
+          <Input id="session-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={defaultName} autoFocus />
+        </div>
+        <div className="mt-4 flex items-center gap-3 rounded-lg bg-canvas p-3">
+          <CompanyLogo ticker={savedCompany.ticker} name={savedCompany.name} sector={savedCompany.sector} size="sm" />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-ink">{savedCompany.name}</p>
+            {savedCompany.ticker && <p className="font-mono text-xs text-muted">{savedCompany.ticker}</p>}
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" loading={creating}>Create and open</Button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function AnalystPanel({ companyInfo, selectedFiling, filingContent, savedCompany, onSaveCompany, savingCompany }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
-  const [showSessionModal, setShowSessionModal] = useState(false);
-  const [sessionName, setSessionName] = useState('');
-  const [creatingSession, setCreatingSession] = useState(false);
-  const messagesEndRef = useRef(null);
-  const inputRef = useRef(null);
-  const router = useRouter();
+  const [showSessionDialog, setShowSessionDialog] = useState(false);
+  const scrollRef = useRef(null);
 
-  const isDisabled = !filingContent?.textContent;
+  const canChat = Boolean(filingContent?.textContent);
 
-  // Clear chat when filing changes
-  useEffect(() => {
-    setMessages([]);
-  }, [selectedFiling?.accessionNumber]);
+  useEffect(() => setMessages([]), [selectedFiling?.accessionNumber]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, thinking]);
 
   const sendMessage = async (question) => {
-    if (!question.trim() || !filingContent?.textContent || thinking) return;
     const q = question.trim();
+    if (!q || !canChat || thinking) return;
     setMessages((prev) => [...prev, { role: 'user', content: q }]);
     setInput('');
     setThinking(true);
@@ -477,30 +428,18 @@ function RightPanel({ companyInfo, selectedFiling, filingContent, savedCompany, 
         body: JSON.stringify({
           question: q,
           filingText: filingContent.textContent,
-          companyInfo: companyInfo ? {
-            name: companyInfo.name,
-            ticker: companyInfo.ticker,
-          } : {},
+          companyInfo: companyInfo ? { name: companyInfo.name, ticker: companyInfo.ticker } : {},
           conversationHistory: messages,
         }),
       });
-
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
       setMessages((prev) => [...prev, { role: 'assistant', content: data.answer }]);
     } catch (err) {
-      setMessages((prev) => [...prev, {
-        role: 'assistant',
-        content: `**Error:** Failed to analyze the filing. ${err.message}`,
-      }]);
+      setMessages((prev) => [...prev, { role: 'error', content: err.message }]);
     } finally {
       setThinking(false);
     }
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    sendMessage(input);
   };
 
   const handleKeyDown = (e) => {
@@ -510,270 +449,134 @@ function RightPanel({ companyInfo, selectedFiling, filingContent, savedCompany, 
     }
   };
 
-  const handleCreateSession = async (e) => {
-    e.preventDefault();
-    if (!savedCompany) return;
-    setCreatingSession(true);
-    try {
-      const res = await authenticatedFetch(`${API_URL}/api/research-sessions`, {
-        method: 'POST',
-        body: JSON.stringify({
-          sessionName: sessionName.trim() || `${companyInfo?.name} — ${selectedFiling?.form} Analysis`,
-          companyId: savedCompany._id,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success('Research session created!');
-        router.push(`/research/${data._id}`);
-      } else {
-        toast.error(data.error || 'Failed to create session');
-      }
-    } catch {
-      toast.error('Failed to create session');
-    } finally {
-      setCreatingSession(false);
-    }
-  };
-
-  const suggestedQuestions = selectedFiling
-    ? selectedFiling.form === '10-K'
-      ? [
-          'What are the main risk factors disclosed?',
-          'What is the revenue trend over recent periods?',
-          'Describe the competitive landscape.',
-          'What is management\'s outlook for next year?',
-          'What are the key business segments?',
-        ]
-      : [
-          'What were the revenue and earnings this quarter?',
-          'How did operating income change vs last quarter?',
-          'Were there any significant one-time items?',
-          'What does management say about guidance?',
-          'What are the key risks highlighted?',
-        ]
-    : [];
-
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-slate-800 shrink-0">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-7 h-7 rounded-lg bg-violet-500/20 flex items-center justify-center">
-            <Sparkles className="w-3.5 h-3.5 text-violet-400" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-white">AI Analyst</p>
-            <p className="text-xs text-slate-500">
-              {selectedFiling
-                ? `Analyzing ${selectedFiling.form} · ${companyInfo?.ticker || 'company'}`
-                : 'Load a filing to start'}
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 border-b border-line p-4">
+        <div className="flex items-center gap-2.5">
+          <LogoMark className="size-6" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-ink">Analyst</p>
+            <p className="truncate text-xs text-muted">
+              {selectedFiling ? `Reading the ${selectedFiling.form} for ${companyInfo?.ticker || companyInfo?.name}` : 'Open a filing to start'}
             </p>
           </div>
         </div>
 
-        {/* Save Company / Research Session buttons */}
         {companyInfo && (
-          <div className="flex items-center gap-2">
-            {!savedCompany ? (
-              <button
-                onClick={onSaveCompany}
-                disabled={savingCompany}
-                className="flex-1 flex items-center justify-center gap-1.5 text-xs py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 text-slate-300 hover:text-white transition-all disabled:opacity-50"
-              >
-                {savingCompany ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <BookmarkPlus className="w-3.5 h-3.5" />
-                )}
-                Save to My Companies
-              </button>
+          <div className="mt-3.5 flex gap-2">
+            {savedCompany ? (
+              <>
+                <span className="flex h-8 items-center gap-1.5 rounded-lg bg-positive-soft px-2.5 text-[13px] font-medium text-positive">
+                  <Check className="size-3.5" /> Saved
+                </span>
+                <Button size="sm" icon={MessagesSquare} className="flex-1" onClick={() => setShowSessionDialog(true)}>
+                  Research session
+                </Button>
+              </>
             ) : (
-              <div className="flex items-center gap-2 flex-1">
-                <div className="flex items-center gap-1.5 text-xs text-emerald-400 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-                  <Check className="w-3.5 h-3.5" />
-                  Saved
-                </div>
-                <button
-                  onClick={() => setShowSessionModal(true)}
-                  className="flex-1 flex items-center justify-center gap-1.5 text-xs py-2 px-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white transition-colors"
-                >
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  Start Research Session
-                </button>
-              </div>
+              <Button size="sm" variant="secondary" icon={BookmarkPlus} loading={savingCompany} onClick={onSaveCompany} className="flex-1">
+                Save to companies
+              </Button>
             )}
           </div>
         )}
       </div>
 
-      {/* Chat messages */}
-      <div className="flex-1 overflow-y-auto">
-        {isDisabled ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-4 py-8">
-            <div className="w-12 h-12 rounded-2xl bg-slate-800/60 flex items-center justify-center mb-3">
-              <MessageSquare className="w-6 h-6 text-slate-600" />
-            </div>
-            <p className="text-sm text-slate-500">
-              {filingContent
-                ? 'No readable text could be extracted from this filing, so AI chat is unavailable'
-                : 'Select a filing to start asking questions about it'}
-            </p>
-          </div>
+      <div ref={scrollRef} className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
+        {!canChat ? (
+          <EmptyState
+            icon={MessagesSquare}
+            title={filingContent ? 'Chat unavailable for this filing' : 'Ask about any filing'}
+            description={filingContent ? 'No readable text could be extracted from this filing.' : 'Select a filing and ask questions about it in plain English.'}
+          />
         ) : (
-          <div className="p-4 space-y-3">
-            {messages.length === 0 && suggestedQuestions.length > 0 && (
-              <div className="space-y-1.5">
-                <p className="text-xs text-slate-500 font-medium mb-2">Suggested questions</p>
-                {suggestedQuestions.map((q, i) => (
-                  <button
-                    key={i}
-                    onClick={() => sendMessage(q)}
-                    className="w-full text-left text-xs px-3 py-2 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700/50 hover:border-slate-600 text-slate-300 hover:text-white transition-all"
-                  >
-                    {q}
-                  </button>
-                ))}
+          <div className="space-y-5 p-4">
+            {messages.length === 0 && (
+              <div>
+                <p className="mb-2 text-xs text-muted">Try asking</p>
+                <div className="space-y-1.5">
+                  {suggestedQuestionsFor(selectedFiling).map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      onClick={() => sendMessage(q)}
+                      className="w-full rounded-lg border border-line px-3 py-2 text-left text-[13px] leading-snug text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div
-                  className={`max-w-[90%] rounded-2xl px-3 py-2.5 text-sm ${
-                    msg.role === 'user'
-                      ? 'bg-violet-600 text-white rounded-br-sm'
-                      : 'bg-slate-800 text-slate-200 rounded-bl-sm border border-slate-700'
-                  }`}
-                >
-                  {msg.role === 'user' ? (
-                    <p className="text-sm">{msg.content}</p>
-                  ) : (
-                    <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>
-                      {msg.content}
-                    </ReactMarkdown>
-                  )}
+            {messages.map((msg, i) =>
+              msg.role === 'user' ? (
+                <div key={i} className="flex animate-fade-up justify-end">
+                  <p className="max-w-[90%] rounded-2xl rounded-br-md bg-ink px-3.5 py-2 text-[13px] leading-relaxed text-white">{msg.content}</p>
                 </div>
-              </div>
-            ))}
+              ) : msg.role === 'error' ? (
+                <div key={i} className="flex animate-fade-up items-start gap-2 rounded-lg border border-negative/20 bg-negative-soft px-3 py-2.5 text-[13px] text-negative">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  {msg.content}
+                </div>
+              ) : (
+                <div key={i} className="animate-fade-up">
+                  <Markdown className="text-[13px]">{msg.content}</Markdown>
+                  <p className="mt-2 text-[11px] text-faint">AI-generated. Verify against the filing.</p>
+                </div>
+              ),
+            )}
 
             {thinking && (
-              <div className="flex justify-start">
-                <div className="bg-slate-800 border border-slate-700 rounded-2xl rounded-bl-sm px-4 py-3">
-                  <div className="flex gap-1 items-center">
-                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce [animation-delay:0ms]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce [animation-delay:150ms]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce [animation-delay:300ms]" />
-                    <span className="text-xs text-slate-500 ml-2">Analyzing…</span>
-                  </div>
-                </div>
+              <div className="flex items-center gap-2 text-[13px] text-muted">
+                <Loader2 className="size-3.5 animate-spin" /> Reading the filing
               </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
         )}
       </div>
 
-      {/* Input */}
-      {!isDisabled && (
-        <form onSubmit={handleSubmit} className="p-4 border-t border-slate-800 shrink-0">
-          <div className="flex items-end gap-2">
+      {canChat && (
+        <div className="shrink-0 border-t border-line p-3">
+          <form
+            onSubmit={(e) => { e.preventDefault(); sendMessage(input); }}
+            className="flex items-end gap-2 rounded-xl border border-line bg-surface p-1.5 transition-[border-color,box-shadow] focus-within:border-brand focus-within:ring-3 focus-within:ring-brand/15"
+          >
             <textarea
-              ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask about this filing…"
+              placeholder="Ask about this filing"
               rows={2}
-              className="flex-1 resize-none bg-slate-800/60 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 transition-all"
+              aria-label="Question"
+              className="min-h-10 flex-1 resize-none bg-transparent px-2 py-1.5 text-[13px] leading-normal text-ink outline-none placeholder:text-faint"
             />
             <button
               type="submit"
               disabled={!input.trim() || thinking}
-              className="w-9 h-9 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors shrink-0"
+              aria-label="Send"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-ink text-white transition-colors hover:bg-ink-2 disabled:bg-line-strong"
             >
-              {thinking ? (
-                <Loader2 className="w-4 h-4 text-white animate-spin" />
-              ) : (
-                <Send className="w-4 h-4 text-white" />
-              )}
+              {thinking ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
             </button>
-          </div>
-          <p className="text-[10px] text-slate-600 mt-1.5 text-center">Enter to send · Shift+Enter for newline</p>
-        </form>
+          </form>
+        </div>
       )}
 
-      {/* Create Research Session Modal */}
-      <AnimatePresence>
-        {showSessionModal && savedCompany && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-slate-900 border border-slate-700 rounded-2xl p-5 w-full max-w-sm shadow-2xl"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-white">New Research Session</h3>
-                <button onClick={() => setShowSessionModal(false)} className="text-slate-500 hover:text-slate-300">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <form onSubmit={handleCreateSession} className="space-y-4">
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1.5">Session Name</label>
-                  <input
-                    type="text"
-                    value={sessionName}
-                    onChange={(e) => setSessionName(e.target.value)}
-                    placeholder={`${companyInfo?.name} — ${selectedFiling?.form} Analysis`}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-all"
-                  />
-                </div>
-                <div className="flex items-center gap-2 p-3 bg-slate-800/60 rounded-xl">
-                  <Building2 className="w-4 h-4 text-violet-400 shrink-0" />
-                  <div>
-                    <p className="text-xs font-medium text-slate-200">{savedCompany.name}</p>
-                    {savedCompany.ticker && (
-                      <p className="text-xs text-slate-500 font-mono">{savedCompany.ticker}</p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowSessionModal(false)}
-                    className="flex-1 py-2.5 rounded-xl border border-slate-700 text-sm text-slate-400 hover:text-slate-200 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={creatingSession}
-                    className="flex-1 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-sm text-white font-medium transition-colors disabled:opacity-50"
-                  >
-                    {creatingSession ? (
-                      <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                    ) : (
-                      'Create & Go'
-                    )}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {showSessionDialog && savedCompany && (
+        <NewSessionDialog
+          companyInfo={companyInfo}
+          selectedFiling={selectedFiling}
+          savedCompany={savedCompany}
+          onClose={() => setShowSessionDialog(false)}
+        />
+      )}
     </div>
   );
 }
 
-// ─── Main Explorer Page ────────────────────────────────────────────
+// ─── Page ────────────────────────────────────────────────────────
+
 export default function ExplorePage() {
   const [companyInfo, setCompanyInfo] = useState(null);
   const [filings, setFilings] = useState([]);
@@ -781,55 +584,61 @@ export default function ExplorePage() {
   const [selectedFiling, setSelectedFiling] = useState(null);
   const [filingContent, setFilingContent] = useState(null);
   const [loadingContent, setLoadingContent] = useState(false);
+  const [myCompanies, setMyCompanies] = useState([]);
   const [savedCompany, setSavedCompany] = useState(null);
   const [savingCompany, setSavingCompany] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState('filings');
+
+  // Load the user's companies once so an already-saved company shows as saved.
+  useEffect(() => {
+    authenticatedFetch(`${API_URL}/companies`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then(setMyCompanies)
+      .catch(() => {});
+  }, []);
 
   const handleCompanySelect = useCallback(async (company) => {
     setLoadingFilings(true);
     setSelectedFiling(null);
     setFilingContent(null);
     setFilings([]);
-    setSavedCompany(null);
+    setMobilePanel('filings');
 
+    const cikRaw = company.cikRaw || parseInt(company.cik);
     try {
-      const res = await authenticatedFetch(
-        `${API_URL}/companies/sec/filings/${company.cik || company.cikRaw}?forms=10-K,10-Q`
-      );
+      const res = await authenticatedFetch(`${API_URL}/companies/sec/filings/${company.cik || cikRaw}?forms=10-K,10-Q`);
+      if (!res.ok) throw new Error();
       const data = await res.json();
-      setCompanyInfo({
-        ...data.companyInfo,
-        cikRaw: company.cikRaw || parseInt(company.cik),
-      });
+      setCompanyInfo({ ...data.companyInfo, cikRaw });
       setFilings(data.filings || []);
-    } catch (err) {
+    } catch {
       toast.error('Failed to load filings');
-      setCompanyInfo({
-        name: company.name,
-        ticker: company.ticker,
-        cik: company.cik,
-        cikRaw: company.cikRaw || parseInt(company.cik),
-      });
+      setCompanyInfo({ name: company.name, ticker: company.ticker, cik: company.cik, cikRaw });
     } finally {
       setLoadingFilings(false);
     }
   }, []);
 
+  useEffect(() => {
+    const ticker = companyInfo?.ticker?.toUpperCase();
+    setSavedCompany(ticker ? myCompanies.find((c) => c.ticker === ticker) || null : null);
+  }, [companyInfo, myCompanies]);
+
   const handleFilingSelect = useCallback(async (filing) => {
     setSelectedFiling(filing);
     setFilingContent(null);
     setLoadingContent(true);
+    setMobilePanel('document');
 
     try {
       const cik = companyInfo?.cikRaw || parseInt(companyInfo?.cik);
       const res = await authenticatedFetch(
-        `${API_URL}/companies/sec/filing-content/${cik}/${filing.accessionNumber}?doc=${encodeURIComponent(filing.primaryDocument)}`
+        `${API_URL}/companies/sec/filing-content/${cik}/${filing.accessionNumber}?doc=${encodeURIComponent(filing.primaryDocument)}`,
       );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setFilingContent(data);
-    } catch (err) {
-      toast.error('Failed to load filing content — try text view');
-      setFilingContent(null);
+      if (!res.ok) throw new Error();
+      setFilingContent(await res.json());
+    } catch {
+      toast.error('Could not load the filing text, so the analyst is unavailable for it');
     } finally {
       setLoadingContent(false);
     }
@@ -839,91 +648,71 @@ export default function ExplorePage() {
     if (!companyInfo || savingCompany) return;
     setSavingCompany(true);
     try {
-      const sector = companyInfo.sicDescription
-        ? deriveSectorFromSic(companyInfo.sicDescription)
-        : 'Other';
-
       const res = await authenticatedFetch(`${API_URL}/companies`, {
         method: 'POST',
         body: JSON.stringify({
           name: companyInfo.name,
           ticker: companyInfo.ticker || '',
-          sector,
+          sector: companyInfo.sector || 'Other',
           exchange: companyInfo.exchanges?.[0] || '',
-          description: companyInfo.sicDescription ? `${companyInfo.name} — ${companyInfo.sicDescription}` : companyInfo.name,
-          country: '',
-          emoji: '🏢',
-          color: '#8B5CF6',
+          description: companyInfo.sicDescription ? `${companyInfo.name}. ${companyInfo.sicDescription}.` : '',
+          country: 'United States',
         }),
       });
-
       const data = await res.json();
-      if (res.ok) {
-        setSavedCompany(data);
-        toast.success(`${companyInfo.name} added to My Companies`);
-      } else if (res.status === 409 || data.error?.includes('duplicate')) {
-        toast('Company already in your list', { icon: 'ℹ️' });
-        setSavedCompany(data);
+      if (res.ok || (res.status === 409 && data.company)) {
+        setMyCompanies((prev) => (prev.some((c) => c._id === data.company._id) ? prev : [data.company, ...prev]));
+        toast.success(res.ok ? `${companyInfo.name} saved to your companies` : data.message);
       } else {
-        toast.error(data.error || 'Failed to save company');
+        throw new Error(data.message || 'Could not save the company');
       }
-    } catch {
-      toast.error('Failed to save company');
+    } catch (err) {
+      toast.error(err.message);
     } finally {
       setSavingCompany(false);
     }
   };
 
+  const panelClass = (id) => cn('min-h-0 flex-col bg-surface', mobilePanel === id ? 'flex' : 'hidden', 'xl:flex');
+
   return (
-    <div className="flex h-screen bg-slate-950 pt-16">
-      {/* Left Panel */}
-      <div className="w-72 shrink-0 border-r border-slate-800 flex flex-col overflow-hidden">
-        <LeftPanel
-          onCompanySelect={handleCompanySelect}
-          onFilingSelect={handleFilingSelect}
-          companyInfo={companyInfo}
-          filings={filings}
-          selectedFiling={selectedFiling}
-          loadingFilings={loadingFilings}
-        />
+    <div className="flex h-app flex-col">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-4 py-2.5 xl:hidden">
+        <SegmentedControl options={MOBILE_PANELS} value={mobilePanel} onChange={setMobilePanel} className="w-full max-w-sm" />
       </div>
 
-      {/* Center Panel */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden border-r border-slate-800">
-        <CenterPanel
-          companyInfo={companyInfo}
-          selectedFiling={selectedFiling}
-          filingContent={filingContent}
-          loadingContent={loadingContent}
-        />
-      </div>
+      <div className="flex min-h-0 flex-1">
+        <section aria-label="Filings" className={cn(panelClass('filings'), 'w-full xl:w-72 xl:shrink-0 xl:border-r xl:border-line')}>
+          <FilingsPanel
+            onCompanySelect={handleCompanySelect}
+            onFilingSelect={handleFilingSelect}
+            companyInfo={companyInfo}
+            filings={filings}
+            selectedFiling={selectedFiling}
+            loadingFilings={loadingFilings}
+          />
+        </section>
 
-      {/* Right Panel */}
-      <div className="w-80 shrink-0 flex flex-col overflow-hidden relative">
-        <RightPanel
-          companyInfo={companyInfo}
-          selectedFiling={selectedFiling}
-          filingContent={filingContent}
-          savedCompany={savedCompany}
-          onSaveCompany={handleSaveCompany}
-          savingCompany={savingCompany}
-        />
+        <section aria-label="Document" className={cn(panelClass('document'), 'w-full min-w-0 xl:flex-1 xl:border-r xl:border-line')}>
+          <DocumentPanel
+            companyInfo={companyInfo}
+            selectedFiling={selectedFiling}
+            filingContent={filingContent}
+            loadingContent={loadingContent}
+          />
+        </section>
+
+        <section aria-label="Analyst" className={cn(panelClass('analyst'), 'w-full xl:w-88 xl:shrink-0')}>
+          <AnalystPanel
+            companyInfo={companyInfo}
+            selectedFiling={selectedFiling}
+            filingContent={filingContent}
+            savedCompany={savedCompany}
+            onSaveCompany={handleSaveCompany}
+            savingCompany={savingCompany}
+          />
+        </section>
       </div>
     </div>
   );
-}
-
-// Derive a rough sector from SEC SIC description
-function deriveSectorFromSic(sicDescription) {
-  const d = (sicDescription || '').toLowerCase();
-  if (d.includes('software') || d.includes('computer') || d.includes('semiconductor') || d.includes('tech')) return 'Technology';
-  if (d.includes('health') || d.includes('pharma') || d.includes('biotech') || d.includes('medical')) return 'Healthcare';
-  if (d.includes('bank') || d.includes('financ') || d.includes('invest') || d.includes('insurance')) return 'Financial Services';
-  if (d.includes('energy') || d.includes('oil') || d.includes('gas') || d.includes('petroleum')) return 'Energy';
-  if (d.includes('retail') || d.includes('wholesale') || d.includes('food') || d.includes('beverag')) return 'Consumer Staples';
-  if (d.includes('manufactur') || d.includes('industrial') || d.includes('machine')) return 'Industrials';
-  if (d.includes('telecom') || d.includes('communicat') || d.includes('media')) return 'Communication Services';
-  if (d.includes('real estate') || d.includes('reit')) return 'Real Estate';
-  if (d.includes('utilities') || d.includes('electric') || d.includes('water')) return 'Utilities';
-  return 'Other';
 }

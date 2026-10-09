@@ -1,109 +1,84 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useInView } from 'framer-motion';
-import { ChevronDown } from 'lucide-react';
+import { useState } from 'react';
+import { Plus } from 'lucide-react';
+import Reveal from '@/components/motion/Reveal';
+import SectionHeading from '@/components/home/SectionHeading';
+import { cn } from '@/lib/utils';
 
-const faqs = [
+const FAQS = [
   {
-    q: 'What types of documents can I ingest?',
-    a: 'Finvest AI supports SEC 10-K filings (auto-fetched via EDGAR), SEC 10-Q quarterly reports, annual reports, earnings call transcripts, and any custom PDF or text document you upload.',
+    q: 'Which documents can I work with?',
+    a: 'SEC 10-K, 10-Q and 8-K filings, fetched directly from EDGAR. You can also add annual reports, earnings call transcripts or any other text you paste in.',
   },
   {
-    q: 'How does the AI avoid hallucinations?',
-    a: 'Every answer is grounded via Retrieval-Augmented Generation (RAG). The AI only uses text retrieved from your ingested documents using Qdrant vector search — it never fabricates facts from generic training data.',
+    q: 'How do you keep answers accurate?',
+    a: 'Answers are generated only from the filing or documents you are working with, and each one cites the section it relies on. When the source does not cover a question, the assistant says so instead of guessing.',
   },
   {
-    q: 'How long does document ingestion take?',
-    a: 'Most SEC 10-K filings are ingested and fully indexed in under 2 minutes. Ingestion runs asynchronously in the background so you can continue using the app while your documents are being processed.',
+    q: 'How long does importing a filing take?',
+    a: 'Most filings are indexed in under two minutes. Importing runs in the background, so you can keep working while it finishes.',
   },
   {
-    q: 'Is my data private?',
-    a: 'Yes. Documents are stored in your private Qdrant collection scoped to your user ID. No other user can access your research data.',
+    q: 'Is my research private?',
+    a: 'Yes. Your companies, documents and research sessions are scoped to your account and are not visible to anyone else.',
   },
   {
-    q: 'Can I research multiple companies?',
-    a: 'Absolutely. You can add as many companies as you need, each with its own document library and research sessions. Ask a question in the context of a specific company to get targeted answers.',
+    q: 'Can I research more than one company?',
+    a: 'Yes. Each company gets its own workspace with documents, research sessions and analysis.',
   },
   {
-    q: 'What is the tech stack?',
-    a: 'Finvest AI uses Next.js 15 on the frontend, Node.js + MongoDB on the backend, Python FastAPI + LangChain for the AI service, and Qdrant as the vector database for semantic document retrieval.',
+    q: 'Is this investment advice?',
+    a: 'No. Finvest AI is a research tool. Verify important figures against the original filing before relying on them.',
   },
 ];
 
-function FAQItem({ item, i }) {
-  const [open, setOpen] = useState(false);
-
+function FAQItem({ item, open, onToggle }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: i * 0.07, duration: 0.5 }}
-      className="border border-violet-400/15 rounded-xl overflow-hidden"
-    >
+    <div className="border-b border-line">
       <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-5 py-4 text-left bg-slate-800/50 hover:bg-slate-800 transition-colors group"
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-6 py-5 text-left"
       >
-        <span className="text-white font-medium text-sm sm:text-base pr-4">{item.q}</span>
-        <ChevronDown
-          className={`w-5 h-5 text-violet-400 shrink-0 transition-transform duration-300 ${
-            open ? 'rotate-180' : ''
-          }`}
+        <span className="text-base font-medium text-ink">{item.q}</span>
+        <Plus
+          className={cn('size-5 shrink-0 text-muted transition-transform duration-300 ease-out-quint', open && 'rotate-45')}
         />
       </button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            key="body"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-            className="overflow-hidden"
-          >
-            <div className="px-5 py-4 text-slate-400 text-sm leading-relaxed bg-slate-900/40">
-              {item.a}
-            </div>
-          </motion.div>
+      {/* grid-rows animates to the content's natural height without JS measurement */}
+      <div
+        className={cn(
+          'grid transition-[grid-template-rows,opacity] duration-300 ease-out-quint',
+          open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
         )}
-      </AnimatePresence>
-    </motion.div>
+      >
+        <div className="overflow-hidden">
+          <p className="pb-5 pr-10 text-[15px] leading-relaxed text-muted">{item.a}</p>
+        </div>
+      </div>
+    </div>
   );
 }
 
 export default function FAQ() {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: '-80px' });
+  const [openIndex, setOpenIndex] = useState(0);
 
   return (
-    <section ref={ref} className="py-24 bg-slate-950">
-      <div className="max-w-3xl mx-auto px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-12"
-        >
-          <span className="inline-block px-3 py-1 rounded-full bg-violet-500/10 border border-violet-400/30 text-violet-400 text-sm font-medium mb-4">
-            FAQ
-          </span>
-          <h2 className="text-4xl font-bold text-white mb-3">
-            Common{' '}
-            <span className="bg-linear-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
-              questions
-            </span>
-          </h2>
-        </motion.div>
-
-        {inView && (
-          <div className="space-y-3">
-            {faqs.map((item, i) => (
-              <FAQItem key={i} item={item} i={i} />
-            ))}
-          </div>
-        )}
+    <section id="faq" className="scroll-mt-20 py-24 sm:py-28">
+      <div className="mx-auto grid max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-[1fr_1.4fr] lg:gap-20">
+        <SectionHeading eyebrow="FAQ" title="Questions, answered." />
+        <Reveal className="border-t border-line">
+          {FAQS.map((item, i) => (
+            <FAQItem
+              key={item.q}
+              item={item}
+              open={openIndex === i}
+              onToggle={() => setOpenIndex(openIndex === i ? -1 : i)}
+            />
+          ))}
+        </Reveal>
       </div>
     </section>
   );

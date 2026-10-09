@@ -2,37 +2,151 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
-import {
-  FileText, Plus, Trash2, Download, Loader2, ArrowLeft,
-  CheckCircle, Clock, AlertCircle, RefreshCw, Building2,
-} from 'lucide-react';
+import toast from 'react-hot-toast';
+import { FileText, Plus, Trash2, Loader2, Download, Building2, Check, ExternalLink } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/authenticate';
+import { formatRelative } from '@/lib/format';
+import CompanyLogo from '@/components/company/CompanyLogo';
+import Button from '@/components/ui/Button';
+import StatusBadge from '@/components/ui/StatusBadge';
+import { Card, CardHeader, EmptyState, PageContainer, PageHeader, Skeleton } from '@/components/ui/Card';
+import { FieldError, Input, Label, Select, Textarea } from '@/components/ui/Field';
+import { cn } from '@/lib/utils';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+// Values match the Document model's docType enum in the API.
 const DOC_TYPES = [
-  { value: 'sec_10k', label: 'SEC 10-K (Annual)' },
-  { value: 'sec_10q', label: 'SEC 10-Q (Quarterly)' },
-  { value: 'annual_report', label: 'Annual Report' },
-  { value: 'earnings_transcript', label: 'Earnings Call Transcript' },
-  { value: 'press_release', label: 'Press Release' },
-  { value: 'other', label: 'Other' },
+  { value: 'sec_10k', label: 'SEC 10-K (annual)' },
+  { value: 'sec_10q', label: 'SEC 10-Q (quarterly)' },
+  { value: 'sec_8k', label: 'SEC 8-K (current report)' },
+  { value: 'annual_report', label: 'Annual report' },
+  { value: 'earnings_call', label: 'Earnings call transcript' },
+  { value: 'press_release', label: 'Press release' },
+  { value: 'analyst_report', label: 'Analyst report' },
+  { value: 'news_article', label: 'News article' },
+  { value: 'custom', label: 'Other' },
 ];
-
 const DOCTYPE_LABELS = Object.fromEntries(DOC_TYPES.map((d) => [d.value, d.label]));
 
-function StatusBadge({ status }) {
-  const config = {
-    completed: { icon: CheckCircle, color: 'text-green-400 bg-green-500/10 border-green-500/20' },
-    processing: { icon: Clock, color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20' },
-    failed: { icon: AlertCircle, color: 'text-red-400 bg-red-500/10 border-red-500/20' },
-    pending: { icon: Clock, color: 'text-slate-400 bg-slate-700 border-slate-600' },
-  };
-  const c = config[status] || config.pending;
+const SEC_FORMS = [
+  { key: '10-K', label: '10-K', description: 'Annual report' },
+  { key: '10-Q', label: '10-Q', description: 'Quarterly report' },
+  { key: '8-K', label: '8-K', description: 'Current report' },
+];
+
+const POLL_MS = 5000;
+
+const emptyForm = () => ({ title: '', docType: 'sec_10k', year: String(new Date().getFullYear()), sourceUrl: '', content: '' });
+
+function ImportPanel({ onImport, onCancel, importing }) {
+  const [forms, setForms] = useState(['10-K']);
+  const toggle = (key) => setForms((prev) => (prev.includes(key) ? prev.filter((f) => f !== key) : [...prev, key]));
+
   return (
-    <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border ${c.color}`}>
-      <c.icon className="w-3 h-3" /> {status}
-    </span>
+    <Card className="mb-6 animate-fade-up">
+      <CardHeader title="Import SEC filings" description="Fetch the latest filings from SEC EDGAR and index them for search." />
+      <div className="p-5">
+        <div className="grid gap-2 sm:grid-cols-3">
+          {SEC_FORMS.map((f) => {
+            const selected = forms.includes(f.key);
+            return (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => toggle(f.key)}
+                aria-pressed={selected}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg border px-3.5 py-3 text-left transition-colors',
+                  selected ? 'border-ink bg-canvas' : 'border-line hover:border-line-strong',
+                )}
+              >
+                <span
+                  className={cn(
+                    'flex size-4.5 shrink-0 items-center justify-center rounded border transition-colors',
+                    selected ? 'border-ink bg-ink text-white' : 'border-line-strong',
+                  )}
+                >
+                  {selected && <Check className="size-3" strokeWidth={3} />}
+                </span>
+                <span>
+                  <span className="block font-mono text-sm font-medium text-ink">{f.label}</span>
+                  <span className="block text-xs text-muted">{f.description}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+          <Button icon={Download} loading={importing} disabled={forms.length === 0} onClick={() => onImport(forms)}>
+            Import {forms.join(', ')}
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function AddDocumentPanel({ companyId, onAdded, onCancel }) {
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const res = await authenticatedFetch(`${API_URL}/documents`, {
+        method: 'POST',
+        body: JSON.stringify({ ...form, companyId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || data.error || 'Failed to add document');
+      onAdded(data.document);
+    } catch (err) {
+      setError(err.message);
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card className="mb-6 animate-fade-up">
+      <CardHeader title="Add a document" description="Paste the text of a report, transcript or article. It will be split up and indexed." />
+      <form onSubmit={handleSubmit} className="space-y-5 p-5">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="doc-title">Title</Label>
+            <Input id="doc-title" value={form.title} onChange={set('title')} placeholder="Apple 2025 annual report" required />
+          </div>
+          <div>
+            <Label htmlFor="doc-type">Type</Label>
+            <Select id="doc-type" value={form.docType} onChange={set('docType')}>
+              {DOC_TYPES.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="doc-year">Year</Label>
+            <Input id="doc-year" value={form.year} onChange={set('year')} inputMode="numeric" placeholder="2025" />
+          </div>
+          <div>
+            <Label htmlFor="doc-url" hint="Optional">Source URL</Label>
+            <Input id="doc-url" type="url" value={form.sourceUrl} onChange={set('sourceUrl')} placeholder="https://www.sec.gov/..." />
+          </div>
+        </div>
+        <div>
+          <Label htmlFor="doc-content">Content</Label>
+          <Textarea id="doc-content" value={form.content} onChange={set('content')} rows={7} placeholder="Paste the document text here" required />
+        </div>
+        <FieldError>{error}</FieldError>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+          <Button type="submit" loading={saving}>Add and index</Button>
+        </div>
+      </form>
+    </Card>
   );
 }
 
@@ -43,342 +157,203 @@ export default function DocumentsPage() {
   const [companies, setCompanies] = useState([]);
   const [selectedCompany, setSelectedCompany] = useState(companyIdParam || '');
   const [documents, setDocuments] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
+  const [loadingDocs, setLoadingDocs] = useState(false);
   const [deleting, setDeleting] = useState(null);
-  const [ingesting, setIngesting] = useState(false);
-  const [ingestTypes, setIngestTypes] = useState(['10-K']);
-  const [showIngestPanel, setShowIngestPanel] = useState(false);
-
-  // Add form state
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [addType, setAddType] = useState('ingest'); // 'ingest' | 'manual'
-  const [addForm, setAddForm] = useState({ title: '', docType: 'sec_10k', year: new Date().getFullYear().toString(), sourceUrl: '', content: '' });
-  const [addLoading, setAddLoading] = useState(false);
-  const [addError, setAddError] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [panel, setPanel] = useState(null); // 'import' | 'add' | null
 
   useEffect(() => {
-    fetchCompanies();
+    (async () => {
+      try {
+        const res = await authenticatedFetch(`${API_URL}/companies`);
+        if (res.ok) {
+          const data = await res.json();
+          setCompanies(data);
+          if (!companyIdParam && data.length > 0) setSelectedCompany(data[0]._id);
+        }
+      } catch {
+        toast.error('Failed to load companies');
+      } finally {
+        setLoadingCompanies(false);
+      }
+    })();
+  }, [companyIdParam]);
+
+  const fetchDocuments = useCallback(async (companyId, { quiet = false } = {}) => {
+    if (!quiet) setLoadingDocs(true);
+    try {
+      const res = await authenticatedFetch(`${API_URL}/documents?companyId=${companyId}`);
+      if (res.ok) setDocuments(await res.json());
+    } catch {
+      if (!quiet) toast.error('Failed to load documents');
+    } finally {
+      if (!quiet) setLoadingDocs(false);
+    }
   }, []);
 
   useEffect(() => {
+    setPanel(null);
     if (selectedCompany) fetchDocuments(selectedCompany);
     else setDocuments([]);
-  }, [selectedCompany]);
+  }, [selectedCompany, fetchDocuments]);
 
-  const fetchCompanies = async () => {
-    try {
-      const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/companies`);
-      if (res.ok) {
-        const data = await res.json();
-        setCompanies(data);
-        if (!companyIdParam && data.length > 0) setSelectedCompany(data[0]._id);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Imports run in the background: refresh quietly until nothing is processing.
+  const hasProcessing = documents.some((d) => d.status === 'processing');
+  useEffect(() => {
+    if (!hasProcessing || !selectedCompany) return;
+    const id = setInterval(() => fetchDocuments(selectedCompany, { quiet: true }), POLL_MS);
+    return () => clearInterval(id);
+  }, [hasProcessing, selectedCompany, fetchDocuments]);
 
-  const fetchDocuments = useCallback(async (companyId) => {
-    setLoading(true);
+  const handleDelete = async (doc) => {
+    if (!confirm(`Remove "${doc.title}" and its search index?`)) return;
+    setDeleting(doc._id);
     try {
-      const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/documents?companyId=${companyId}`);
-      if (res.ok) setDocuments(await res.json());
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const handleDelete = async (docId) => {
-    if (!confirm('Remove this document and its Qdrant vectors?')) return;
-    setDeleting(docId);
-    try {
-      const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/documents/${docId}`, { method: 'DELETE' });
-      if (res.ok) setDocuments((p) => p.filter((d) => d._id !== docId));
-    } catch (err) {
-      console.error(err);
+      const res = await authenticatedFetch(`${API_URL}/documents/${doc._id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
+      setDocuments((prev) => prev.filter((d) => d._id !== doc._id));
+    } catch {
+      toast.error('Could not delete the document');
     } finally {
       setDeleting(null);
     }
   };
 
-  const toggleIngestType = (type) => {
-    setIngestTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
-    );
-  };
-
-  const handleIngest = async () => {
-    if (!selectedCompany || ingestTypes.length === 0) return;
-    setIngesting(true);
+  const handleImport = async (forms) => {
+    setImporting(true);
     try {
-      const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/documents/ingest`, {
+      const res = await authenticatedFetch(`${API_URL}/documents/ingest`, {
         method: 'POST',
-        body: JSON.stringify({ companyId: selectedCompany, docTypes: ingestTypes }),
-      });
-      if (res.ok) {
-        setShowIngestPanel(false);
-        await fetchDocuments(selectedCompany);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIngesting(false);
-    }
-  };
-
-  const handleAddDocument = async (e) => {
-    e.preventDefault();
-    setAddLoading(true);
-    setAddError('');
-    try {
-      const body = { ...addForm, companyId: selectedCompany };
-      const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/documents`, {
-        method: 'POST',
-        body: JSON.stringify(body),
+        body: JSON.stringify({ companyId: selectedCompany, docTypes: forms }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to add document');
-      setDocuments((p) => [data, ...p]);
-      setShowAddForm(false);
-      setAddForm({ title: '', docType: 'sec_10k', year: new Date().getFullYear().toString(), sourceUrl: '', content: '' });
+      if (!res.ok) throw new Error(data.message || data.error || 'Import failed');
+      toast.success('Import started. This usually takes a minute or two.');
+      setPanel(null);
+      await fetchDocuments(selectedCompany, { quiet: true });
     } catch (err) {
-      setAddError(err.message);
+      toast.error(err.message);
     } finally {
-      setAddLoading(false);
+      setImporting(false);
     }
   };
 
   const currentCompany = companies.find((c) => c._id === selectedCompany);
+  const togglePanel = (name) => setPanel((p) => (p === name ? null : name));
 
   return (
-    <div className="min-h-screen bg-slate-950 pt-20 pb-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-white">Documents</h1>
-            <p className="text-slate-400 text-sm mt-1">Manage indexed company documents</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {selectedCompany && (
-              <>
-                <button
-                  onClick={() => setShowIngestPanel((v) => !v)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                    showIngestPanel
-                      ? 'bg-violet-600 border-violet-500 text-white'
-                      : 'bg-slate-800 border-violet-400/20 hover:border-violet-400/40 text-slate-300 hover:text-white'
-                  }`}
-                >
-                  <Download className="w-4 h-4" />
-                  Auto-Ingest SEC
-                </button>
-                <button
-                  onClick={() => setShowAddForm(!showAddForm)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-medium transition-all"
-                >
-                  <Plus className="w-4 h-4" /> Add Document
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+    <PageContainer size="lg">
+      <PageHeader
+        title="Documents"
+        description="Filings and documents indexed for each company."
+        actions={
+          selectedCompany && (
+            <>
+              <Button variant="secondary" icon={Download} onClick={() => togglePanel('import')}>Import SEC filings</Button>
+              <Button icon={Plus} onClick={() => togglePanel('add')}>Add document</Button>
+            </>
+          )
+        }
+      />
 
-        {/* Company Selector */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
-          {companies.map((c) => (
-            <button
-              key={c._id}
-              onClick={() => setSelectedCompany(c._id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
-                selectedCompany === c._id
-                  ? 'bg-violet-600 text-white shadow-md'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
-              }`}
-            >
-              <span>{c.emoji || '🏢'}</span>
-              {c.name}
-            </button>
-          ))}
-        </div>
-
-        {/* Ingest Panel */}
-        {showIngestPanel && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-slate-900 border border-violet-400/20 rounded-2xl p-5 mb-6"
+      {loadingCompanies ? (
+        <Skeleton className="mb-6 h-10 w-80" />
+      ) : companies.length > 0 && (
+        <div className="mb-6 flex items-center gap-3">
+          <CompanyLogo ticker={currentCompany?.ticker} name={currentCompany?.name} sector={currentCompany?.sector} />
+          <Select
+            aria-label="Company"
+            value={selectedCompany}
+            onChange={(e) => setSelectedCompany(e.target.value)}
+            className="w-full max-w-xs"
           >
-            <h3 className="text-base font-semibold text-white mb-1">Auto-Ingest SEC Filings</h3>
-            <p className="text-xs text-slate-400 mb-4">Select which filing types to fetch from SEC EDGAR. Each will be chunked and embedded into your vector store.</p>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {[{ key: '10-K', label: '10-K · Annual Report' }, { key: '10-Q', label: '10-Q · Quarterly Report' }, { key: '8-K', label: '8-K · Current Report' }].map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => toggleIngestType(key)}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
-                    ingestTypes.includes(key)
-                      ? 'bg-violet-600 border-violet-500 text-white'
-                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-violet-400/40 hover:text-white'
-                  }`}
-                >
-                  {ingestTypes.includes(key) && <span className="mr-1">✓</span>}{label}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-3 items-center">
-              <button
-                onClick={handleIngest}
-                disabled={ingesting || ingestTypes.length === 0}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-medium transition-all disabled:opacity-60"
-              >
-                {ingesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                {ingesting ? 'Fetching from SEC...' : `Ingest ${ingestTypes.length > 0 ? ingestTypes.join(' + ') : ''}`}
-              </button>
-              <button onClick={() => setShowIngestPanel(false)} className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-400 text-sm hover:text-white transition-colors">
-                Cancel
-              </button>
-            </div>
-          </motion.div>
-        )}
+            {companies.map((c) => (
+              <option key={c._id} value={c._id}>{c.ticker ? `${c.name} (${c.ticker})` : c.name}</option>
+            ))}
+          </Select>
+        </div>
+      )}
 
-        {/* Add Document form */}
-        {showAddForm && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-slate-900 border border-violet-400/20 rounded-2xl p-6 mb-6"
-          >
-            <h3 className="text-lg font-semibold text-white mb-4">Add Document</h3>
-            <form onSubmit={handleAddDocument} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Title *</label>
-                  <input
-                    type="text"
-                    value={addForm.title}
-                    onChange={(e) => setAddForm({ ...addForm, title: e.target.value })}
-                    placeholder="Apple 2023 Annual Report"
-                    required
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Document Type *</label>
-                  <select
-                    value={addForm.docType}
-                    onChange={(e) => setAddForm({ ...addForm, docType: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-violet-500 text-sm"
-                  >
-                    {DOC_TYPES.map((dt) => <option key={dt.value} value={dt.value}>{dt.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Year</label>
-                  <input
-                    type="text"
-                    value={addForm.year}
-                    onChange={(e) => setAddForm({ ...addForm, year: e.target.value })}
-                    placeholder="2024"
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Source URL</label>
-                  <input
-                    type="url"
-                    value={addForm.sourceUrl}
-                    onChange={(e) => setAddForm({ ...addForm, sourceUrl: e.target.value })}
-                    placeholder="https://sec.gov/..."
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 text-sm"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Content * (will be chunked and embedded)</label>
-                <textarea
-                  value={addForm.content}
-                  onChange={(e) => setAddForm({ ...addForm, content: e.target.value })}
-                  placeholder="Paste document text here..."
-                  required
-                  rows={6}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 text-sm resize-none"
-                />
-              </div>
-              {addError && <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{addError}</p>}
-              <div className="flex gap-3">
-                <button type="submit" disabled={addLoading} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 text-white text-sm font-medium disabled:opacity-60">
-                  {addLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add & Embed'}
-                </button>
-                <button type="button" onClick={() => setShowAddForm(false)} className="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-sm hover:bg-slate-700 transition-colors">
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        )}
+      {panel === 'import' && (
+        <ImportPanel importing={importing} onImport={handleImport} onCancel={() => setPanel(null)} />
+      )}
+      {panel === 'add' && (
+        <AddDocumentPanel
+          key={selectedCompany}
+          companyId={selectedCompany}
+          onCancel={() => setPanel(null)}
+          onAdded={(doc) => {
+            setDocuments((prev) => [doc, ...prev]);
+            setPanel(null);
+            toast.success('Document added');
+          }}
+        />
+      )}
 
-        {/* Documents List */}
-        {!selectedCompany ? (
-          <div className="text-center py-16">
-            <Building2 className="w-14 h-14 text-slate-700 mx-auto mb-3" />
-            <p className="text-slate-400">Select a company to view its documents.</p>
-          </div>
-        ) : loading ? (
-          <div className="flex justify-center py-16">
-            <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
-          </div>
-        ) : documents.length === 0 ? (
-          <div className="text-center py-16">
-            <FileText className="w-14 h-14 text-slate-700 mx-auto mb-3" />
-            <p className="text-slate-400 mb-2">No documents for {currentCompany?.name} yet.</p>
-            <p className="text-sm text-slate-500">Use &ldquo;Auto-Ingest SEC&rdquo; to fetch 10-K filings or &ldquo;Add Document&rdquo; to paste text.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {documents.map((doc) => (
-              <motion.div
-                key={doc._id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-4 rounded-xl bg-slate-800/50 border border-violet-400/10 hover:border-violet-400/20 transition-all flex items-center gap-4"
-              >
-                <div className="w-10 h-10 rounded-xl bg-linear-to-br from-violet-500/20 to-indigo-600/20 border border-violet-400/20 flex items-center justify-center shrink-0">
-                  <FileText className="w-5 h-5 text-violet-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-white truncate">{doc.title}</div>
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <span className="text-xs text-slate-400">{DOCTYPE_LABELS[doc.docType] || doc.docType}</span>
-                    {doc.year && <span className="text-xs text-slate-500">· {doc.year}</span>}
-                    <span className="text-xs text-slate-500">· {doc.chunkCount || 0} chunks</span>
-                    {doc.sourceUrl && (
-                      <a href={doc.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-violet-400 hover:text-violet-300">
-                        Source ↗
-                      </a>
-                    )}
-                  </div>
-                  {doc.status === 'failed' && doc.excerpt && (
-                    <div className="text-xs text-red-400/80 mt-1 truncate" title={doc.excerpt}>{doc.excerpt}</div>
-                  )}
-                </div>
-                <StatusBadge status={doc.status} />
-                <button
-                  onClick={() => handleDelete(doc._id)}
-                  disabled={deleting === doc._id}
-                  className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50"
-                >
-                  {deleting === doc._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                </button>
-              </motion.div>
+      <Card>
+        {!loadingCompanies && companies.length === 0 ? (
+          <EmptyState
+            icon={Building2}
+            title="No companies yet"
+            description="Documents belong to a company. Add one first."
+            action={<Button href="/companies/add" size="sm" icon={Plus}>Add company</Button>}
+          />
+        ) : loadingDocs || loadingCompanies ? (
+          <div className="divide-y divide-line">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex items-center gap-4 px-5 py-4">
+                <Skeleton className="size-9 rounded-lg" />
+                <div className="flex-1 space-y-2"><Skeleton className="h-4 w-1/2" /><Skeleton className="h-3 w-1/3" /></div>
+              </div>
             ))}
           </div>
+        ) : documents.length === 0 ? (
+          <EmptyState
+            icon={FileText}
+            title={`No documents for ${currentCompany?.name || 'this company'} yet`}
+            description="Import filings from SEC EDGAR, or add a document by pasting its text."
+            action={<Button size="sm" variant="secondary" icon={Download} onClick={() => setPanel('import')}>Import SEC filings</Button>}
+          />
+        ) : (
+          <ul className="divide-y divide-line">
+            {documents.map((doc) => (
+              <li key={doc._id} className="flex items-center gap-4 px-5 py-4">
+                <div className="hidden size-9 shrink-0 items-center justify-center rounded-lg border border-line bg-canvas sm:flex">
+                  <FileText className="size-4 text-muted" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-ink">{doc.title}</p>
+                  <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
+                    <span>{DOCTYPE_LABELS[doc.docType] || doc.docType}</span>
+                    {doc.year && <span>· {doc.year}</span>}
+                    {doc.status === 'completed' && <span>· {doc.chunkCount || 0} sections indexed</span>}
+                    <span>· {formatRelative(doc.createdAt)}</span>
+                    {doc.sourceUrl && (
+                      <a href={doc.sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-ink-2 hover:text-ink">
+                        · Source <ExternalLink className="size-3" />
+                      </a>
+                    )}
+                  </p>
+                  {doc.status === 'failed' && doc.excerpt && (
+                    <p className="mt-1 truncate text-xs text-negative" title={doc.excerpt}>{doc.excerpt}</p>
+                  )}
+                </div>
+                <StatusBadge status={doc.status} className="shrink-0" />
+                <button
+                  type="button"
+                  onClick={() => handleDelete(doc)}
+                  disabled={deleting === doc._id}
+                  aria-label={`Delete ${doc.title}`}
+                  className="flex size-8 shrink-0 items-center justify-center rounded-lg text-faint transition-colors hover:bg-negative-soft hover:text-negative disabled:opacity-50"
+                >
+                  {deleting === doc._id ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
-      </div>
-    </div>
+      </Card>
+    </PageContainer>
   );
 }

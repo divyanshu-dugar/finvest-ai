@@ -1,40 +1,34 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-
-const publicPaths = ['/', '/login', '/register'];
+import { AUTH_PATHS, PUBLIC_PATHS } from '@/lib/routes';
 
 export default function RouteGuard({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, loading } = useAuth();
-  const [authorized, setAuthorized] = useState(false);
+
+  const isPublic = PUBLIC_PATHS.includes(pathname);
+  const isAuthPage = AUTH_PATHS.includes(pathname);
 
   useEffect(() => {
     if (loading) return;
+    if (!user && !isPublic) router.replace('/login');
+    else if (user && isAuthPage) router.replace('/dashboard');
+  }, [loading, user, isPublic, isAuthPage, router]);
 
-    const isPublic = publicPaths.includes(pathname);
-
-    if (!user && !isPublic) {
-      router.push('/login');
-      setAuthorized(false);
-    } else if (user && (pathname === '/login' || pathname === '/register')) {
-      router.push('/dashboard');
-      setAuthorized(false);
-    } else {
-      setAuthorized(true);
-    }
-  }, [pathname, router, user, loading]);
-
-  if (loading) {
+  // Public pages render straight away (good for first paint); everything else waits for auth.
+  const waiting = isPublic ? !loading && user && isAuthPage : loading || !user;
+  if (waiting) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+      <div className="flex min-h-dvh items-center justify-center">
+        <Loader2 className="size-5 animate-spin text-muted" />
       </div>
     );
   }
 
-  return authorized ? children : null;
+  return children;
 }

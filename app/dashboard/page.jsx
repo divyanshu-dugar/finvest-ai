@@ -2,287 +2,173 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { Building2, FileText, MessageSquare, Activity, Plus, ArrowRight, Loader2 } from 'lucide-react';
-import { authenticatedFetch } from '@/lib/authenticate';
-import OnboardingModal from '@/components/OnboardingModal';
-import { useAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
+import { Building2, FileText, MessagesSquare, Plus, FileSearch, ArrowUpRight, ChevronRight } from 'lucide-react';
+import { authenticatedFetch } from '@/lib/authenticate';
+import { formatRelative, greeting } from '@/lib/format';
+import { useAuth } from '@/context/AuthContext';
+import OnboardingModal from '@/components/OnboardingModal';
+import CompanyLogo from '@/components/company/CompanyLogo';
+import SectorBadge from '@/components/company/SectorBadge';
+import Button from '@/components/ui/Button';
+import { Card, CardHeader, EmptyState, PageContainer, PageHeader, Skeleton } from '@/components/ui/Card';
 
-const containerVariants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.1 } },
-};
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
-};
+function StatCard({ label, value, icon: Icon, href }) {
+  return (
+    <Link
+      href={href}
+      className="group min-w-0 rounded-xl border border-line bg-surface p-4 shadow-card transition-colors duration-150 hover:border-line-strong sm:p-5"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate text-xs text-muted sm:text-[13px]">{label}</span>
+        <Icon className="hidden size-4 shrink-0 text-faint sm:block" />
+      </div>
+      <div className="mt-3 flex items-end justify-between">
+        <span className="font-display text-[26px] font-normal leading-none tracking-[-0.02em] text-ink tabular-nums sm:text-[34px]">
+          {value}
+        </span>
+        <ArrowUpRight className="hidden size-4 text-faint transition-colors group-hover:text-ink sm:block" />
+      </div>
+    </Link>
+  );
+}
+
+function ViewAll({ href }) {
+  return (
+    <Link href={href} className="flex items-center gap-0.5 text-[13px] font-medium text-muted hover:text-ink">
+      View all <ChevronRight className="size-3.5" />
+    </Link>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <>
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
+        {[0, 1, 2].map((i) => <Skeleton key={i} className="h-24 rounded-xl sm:h-29.5" />)}
+      </div>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+        {[0, 1].map((i) => <Skeleton key={i} className="h-80 rounded-xl" />)}
+      </div>
+    </>
+  );
+}
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState(null);
-  const [recentCompanies, setRecentCompanies] = useState([]);
-  const [recentSessions, setRecentSessions] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
-  const userName = user?.userName || '';
 
   useEffect(() => {
-    fetchDashboardData();
+    (async () => {
+      try {
+        const [companiesRes, sessionsRes] = await Promise.all([
+          authenticatedFetch(`${API_URL}/companies`),
+          authenticatedFetch(`${API_URL}/api/research-sessions`),
+        ]);
+        if (!companiesRes.ok || !sessionsRes.ok) toast.error('Some dashboard data failed to load');
+        setCompanies(companiesRes.ok ? await companiesRes.json() : []);
+        setSessions(sessionsRes.ok ? await sessionsRes.json() : []);
+      } catch {
+        toast.error('Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  const fetchDashboardData = async () => {
-    try {
-      const [companiesRes, sessionsRes] = await Promise.all([
-        authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/companies`),
-        authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/research-sessions`),
-      ]);
-
-      const companies = companiesRes.ok ? await companiesRes.json() : [];
-      const sessions = sessionsRes.ok ? await sessionsRes.json() : [];
-
-      if (!companiesRes.ok || !sessionsRes.ok) {
-        toast.error('Some dashboard data failed to load');
-      }
-
-      // Compute stats
-      const totalDocs = companies.reduce((acc, c) => acc + (c.documentCount || 0), 0);
-      setStats({
-        companies: companies.length,
-        documents: totalDocs,
-        sessions: sessions.length,
-      });
-      setRecentCompanies(companies.slice(0, 4));
-      setRecentSessions(sessions.slice(0, 4));
-    } catch (err) {
-      console.error('Dashboard fetch error:', err);
-      toast.error('Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const metricCards = [
-    {
-      label: 'Companies Tracked',
-      value: stats?.companies ?? 0,
-      icon: Building2,
-      href: '/companies/list',
-      accent: 'from-violet-500 to-violet-600',
-    },
-    {
-      label: 'Documents Indexed',
-      value: stats?.documents ?? 0,
-      icon: FileText,
-      href: '/documents',
-      accent: 'from-indigo-500 to-indigo-600',
-    },
-    {
-      label: 'Research Sessions',
-      value: stats?.sessions ?? 0,
-      icon: MessageSquare,
-      href: '/research',
-      accent: 'from-violet-600 to-indigo-500',
-    },
-  ];
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 pt-20 pb-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          {/* Header skeleton */}
-          <div className="mb-8">
-            <div className="h-9 w-64 bg-slate-800 rounded-xl animate-pulse mb-2" />
-            <div className="h-4 w-40 bg-slate-800/60 rounded-lg animate-pulse" />
-          </div>
-          {/* Metric card skeletons */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="p-5 rounded-2xl bg-slate-800/50 border border-violet-400/10 animate-pulse">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-700" />
-                  <div className="w-4 h-4 rounded bg-slate-700" />
-                </div>
-                <div className="h-9 w-12 bg-slate-700 rounded-lg mb-1" />
-                <div className="h-4 w-32 bg-slate-700/60 rounded" />
-              </div>
-            ))}
-          </div>
-          {/* Two-column skeletons */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {[1, 2].map((i) => (
-              <div key={i} className="bg-slate-900 border border-violet-400/10 rounded-2xl p-6 animate-pulse">
-                <div className="h-5 w-40 bg-slate-700 rounded mb-4" />
-                {[1, 2, 3].map((j) => (
-                  <div key={j} className="flex items-center gap-3 p-3 rounded-xl mb-2">
-                    <div className="w-9 h-9 rounded-lg bg-slate-700 shrink-0" />
-                    <div className="flex-1">
-                      <div className="h-4 w-3/4 bg-slate-700 rounded mb-1.5" />
-                      <div className="h-3 w-1/2 bg-slate-700/60 rounded" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const documentCount = companies.reduce((sum, c) => sum + (c.documentCount || 0), 0);
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
-    <div className="min-h-screen bg-slate-950 pt-20 pb-12 px-4 sm:px-6 lg:px-8">
+    <PageContainer>
       <OnboardingModal />
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          <h1 className="text-3xl font-bold text-white">
-            Welcome back,{' '}
-            <span className="bg-linear-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
-              {userName}
-            </span>
-          </h1>
-          <p className="text-slate-400 mt-1">Here&apos;s your research overview.</p>
-        </motion.div>
+      <PageHeader
+        title={`${greeting()}, ${user?.userName || ''}`}
+        description={today}
+        actions={
+          <>
+            <Button href="/explore" variant="secondary" icon={FileSearch}>SEC Explorer</Button>
+            <Button href="/companies/add" icon={Plus}>Add company</Button>
+          </>
+        }
+      />
 
-        {/* Metric Cards */}
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8"
-        >
-          {metricCards.map((card) => (
-            <motion.div key={card.label} variants={itemVariants}>
-              <Link
-                href={card.href}
-                className="block p-5 rounded-2xl bg-slate-800/50 border border-violet-400/10 hover:border-violet-400/30 transition-all group"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className={`w-10 h-10 rounded-xl bg-linear-to-br ${card.accent} flex items-center justify-center shadow-md`}>
-                    <card.icon className="w-5 h-5 text-white" />
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-violet-400 group-hover:translate-x-0.5 transition-all" />
-                </div>
-                <div className="text-3xl font-bold text-white">{card.value}</div>
-                <div className="text-sm text-slate-400 mt-0.5">{card.label}</div>
-              </Link>
-            </motion.div>
-          ))}
-        </motion.div>
+      {loading ? (
+        <DashboardSkeleton />
+      ) : (
+        <div className="animate-fade-up">
+          <div className="grid grid-cols-3 gap-3 sm:gap-4">
+            <StatCard label="Companies" value={companies.length} icon={Building2} href="/companies/list" />
+            <StatCard label="Documents" value={documentCount} icon={FileText} href="/documents" />
+            <StatCard label="Sessions" value={sessions.length} icon={MessagesSquare} href="/research" />
+          </div>
 
-        {/* Two-column layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent Companies */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-slate-900 border border-violet-400/10 rounded-2xl p-6"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-violet-400" />
-                Recent Companies
-              </h2>
-              <Link href="/companies/add" className="flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300 transition-colors">
-                <Plus className="w-3.5 h-3.5" /> Add
-              </Link>
-            </div>
-            {recentCompanies.length === 0 ? (
-              <div className="text-center py-8">
-                <Building2 className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-                <p className="text-slate-400 text-sm">No companies yet.</p>
-                <Link href="/companies/add" className="text-violet-400 text-sm hover:underline mt-1 inline-block">
-                  Add your first company →
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {recentCompanies.map((company) => (
-                  <Link
-                    key={company._id}
-                    href={`/companies/${company._id}`}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/50 hover:bg-slate-800 transition-colors group"
-                  >
-                    <div className="w-9 h-9 rounded-lg bg-linear-to-br from-violet-500/20 to-indigo-600/20 border border-violet-400/20 flex items-center justify-center text-lg">
-                      {company.emoji || '🏢'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-white truncate">{company.name}</div>
-                      <div className="text-xs text-slate-400">{company.ticker} · {company.sector || 'N/A'}</div>
-                    </div>
-                    <div className="text-xs text-slate-500">{company.documentCount || 0} docs</div>
-                    <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-violet-400 transition-colors" />
-                  </Link>
-                ))}
-                {recentCompanies.length > 0 && (
-                  <Link href="/companies/list" className="block text-center text-xs text-violet-400 hover:text-violet-300 pt-2 transition-colors">
-                    View all companies →
-                  </Link>
-                )}
-              </div>
-            )}
-          </motion.div>
+          <div className="mt-6 grid items-start gap-6 lg:grid-cols-[1.4fr_1fr]">
+            <Card>
+              <CardHeader title="Companies" description="Your most recent workspaces" action={companies.length > 0 && <ViewAll href="/companies/list" />} />
+              {companies.length === 0 ? (
+                <EmptyState
+                  icon={Building2}
+                  title="No companies yet"
+                  description="Add a company to start reading its filings and asking questions."
+                  action={<Button href="/companies/add" size="sm" icon={Plus}>Add company</Button>}
+                />
+              ) : (
+                <ul className="divide-y divide-line">
+                  {companies.slice(0, 5).map((c) => (
+                    <li key={c._id}>
+                      <Link href={`/companies/${c._id}`} className="flex items-center gap-3.5 px-5 py-3.5 transition-colors hover:bg-canvas">
+                        <CompanyLogo ticker={c.ticker} name={c.name} sector={c.sector} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-ink">{c.name}</p>
+                          <p className="mt-0.5 font-mono text-xs text-muted">{c.ticker || 'No ticker'}</p>
+                        </div>
+                        <SectorBadge sector={c.sector} className="hidden sm:inline-flex" />
+                        <span className="w-14 shrink-0 text-right text-xs text-muted tabular-nums">
+                          {c.documentCount || 0} {c.documentCount === 1 ? 'doc' : 'docs'}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
 
-          {/* Recent Research Sessions */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35 }}
-            className="bg-slate-900 border border-violet-400/10 rounded-2xl p-6"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-violet-400" />
-                Recent Sessions
-              </h2>
-              <Link href="/research" className="flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300 transition-colors">
-                <Plus className="w-3.5 h-3.5" /> New
-              </Link>
-            </div>
-            {recentSessions.length === 0 ? (
-              <div className="text-center py-8">
-                <MessageSquare className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-                <p className="text-slate-400 text-sm">No research sessions yet.</p>
-                <Link href="/research" className="text-violet-400 text-sm hover:underline mt-1 inline-block">
-                  Start a new session →
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {recentSessions.map((session) => (
-                  <Link
-                    key={session._id}
-                    href={`/research/${session._id}`}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/50 hover:bg-slate-800 transition-colors group"
-                  >
-                    <div className="w-9 h-9 rounded-lg bg-linear-to-br from-indigo-500/20 to-violet-600/20 border border-indigo-400/20 flex items-center justify-center">
-                      <Activity className="w-4 h-4 text-indigo-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-white truncate">{session.sessionName}</div>
-                      <div className="text-xs text-slate-400">
-                        {new Date(session.createdAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-violet-400 transition-colors" />
-                  </Link>
-                ))}
-                {recentSessions.length > 0 && (
-                  <Link href="/research" className="block text-center text-xs text-violet-400 hover:text-violet-300 pt-2 transition-colors">
-                    View all sessions →
-                  </Link>
-                )}
-              </div>
-            )}
-          </motion.div>
+            <Card>
+              <CardHeader title="Research sessions" description="Pick up where you left off" action={sessions.length > 0 && <ViewAll href="/research" />} />
+              {sessions.length === 0 ? (
+                <EmptyState
+                  icon={MessagesSquare}
+                  title="No sessions yet"
+                  description="Start a session to ask questions about a company's filings."
+                  action={<Button href="/research" size="sm" variant="secondary">Start a session</Button>}
+                />
+              ) : (
+                <ul className="divide-y divide-line">
+                  {sessions.slice(0, 5).map((s) => (
+                    <li key={s._id}>
+                      <Link href={`/research/${s._id}`} className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-canvas">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-ink">{s.sessionName}</p>
+                          <p className="mt-0.5 truncate text-xs text-muted">
+                            {s.companyId?.name ? `${s.companyId.name} · ` : ''}
+                            {formatRelative(s.updatedAt || s.createdAt)}
+                          </p>
+                        </div>
+                        <ChevronRight className="size-4 shrink-0 text-faint" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </PageContainer>
   );
 }

@@ -1,1 +1,107 @@
 @import "tailwindcss";
+
+/* Fonts come from next/font CSS variables set on <html> (see app/layout.jsx). */
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-google-sans), var(--font-inter), ui-sans-serif, sans-serif;
+  --font-mono: var(--font-sometype), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@theme {
+  /* Surfaces */
+  --color-canvas: #f6f6f3;
+  --color-surface: #ffffff;
+  --color-subtle: #f0f0eb;
+  --color-line: #e4e3dd;
+  --color-line-strong: #d3d2ca;
+
+  /* Text */
+  --color-ink: #121412;
+  --color-ink-2: #3b3e3a;
+  --color-muted: #6a6d67;
+  --color-faint: #989a93;
+
+  /* Brand: deep emerald */
+  --color-brand: #0b6e4f;
+  --color-brand-hover: #085a40;
+  --color-brand-soft: #e6f1ec;
+  --color-brand-ink: #064532;
+
+  /* Signals */
+  --color-positive: #127a55;
+  --color-positive-soft: #e5f3ec;
+  --color-negative: #b93a26;
+  --color-negative-soft: #fbece8;
+  --color-warning: #9a6408;
+  --color-warning-soft: #fbf3e2;
+  --color-info: #1f5fbf;
+  --color-info-soft: #e9f0fb;
+
+  --shadow-xs: 0 1px 2px rgb(18 20 18 / 0.05);
+  --shadow-card: 0 1px 2px rgb(18 20 18 / 0.04), 0 1px 3px rgb(18 20 18 / 0.04);
+  --shadow-pop: 0 12px 32px -8px rgb(18 20 18 / 0.16), 0 2px 6px rgb(18 20 18 / 0.06);
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-brand) 18%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Height of the viewport minus the mobile top bar; full height once the sidebar takes over. */
+@utility h-app {
+  height: calc(100dvh - 3.5rem);
+  @media (width >= 64rem) {
+    height: 100dvh;
+  }
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility animate-fade-up {
+  animation: fade-up 0.4s var(--ease-out-quint) both;
+}
