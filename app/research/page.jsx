@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -13,9 +13,28 @@ import { Card, CardHeader, EmptyState, PageContainer, PageHeader, Skeleton } fro
 import { Input, Label, Select } from '@/components/ui/Field';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const GENERAL = 'general';
 
-function NewSessionForm({ companies, onCancel }) {
-  const [form, setForm] = useState({ sessionName: '', companyId: '' });
+const lastActivity = (s) => new Date(s.updatedAt || s.createdAt).getTime();
+
+/**
+ * One group per company (plus "General research"), each listing that company's sessions.
+ * Groups are ordered by their most recent session.
+ */
+function groupSessionsByCompany(sessions) {
+  const groups = new Map();
+  for (const s of sessions) {
+    const company = s.companyId && typeof s.companyId === 'object' ? s.companyId : null;
+    const key = company ? company._id : GENERAL;
+    if (!groups.has(key)) groups.set(key, { key, company, sessions: [] });
+    groups.get(key).sessions.push(s);
+  }
+  for (const g of groups.values()) g.sessions.sort((a, b) => lastActivity(b) - lastActivity(a));
+  return [...groups.values()].sort((a, b) => lastActivity(b.sessions[0]) - lastActivity(a.sessions[0]));
+}
+
+function NewSessionForm({ companies, initialCompanyId, onCancel }) {
+  const [form, setForm] = useState({ sessionName: '', companyId: initialCompanyId || '' });
   const [creating, setCreating] = useState(false);
   const router = useRouter();
 
@@ -48,6 +67,7 @@ function NewSessionForm({ companies, onCancel }) {
               value={form.sessionName}
               onChange={(e) => setForm({ ...form, sessionName: e.target.value })}
               placeholder="Apple revenue analysis"
+              autoFocus
               required
             />
           </div>
@@ -74,12 +94,77 @@ function NewSessionForm({ companies, onCancel }) {
   );
 }
 
+function SessionRow({ session, deleting, onDelete }) {
+  return (
+    <li className="group relative flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-canvas">
+      <div className="min-w-0 flex-1">
+        <Link href={`/research/${session._id}`} className="block truncate text-sm font-medium text-ink after:absolute after:inset-0">
+          {session.sessionName}
+        </Link>
+        <p className="mt-0.5 text-xs text-muted">{formatRelative(session.updatedAt || session.createdAt)}</p>
+      </div>
+      <button
+        type="button"
+        onClick={(e) => onDelete(session, e)}
+        disabled={deleting}
+        aria-label={`Delete ${session.sessionName}`}
+        className="relative z-10 flex size-8 items-center justify-center rounded-lg text-faint transition-[opacity,color,background-color] hover:bg-negative-soft hover:text-negative focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+      >
+        {deleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+      </button>
+      <ChevronRight className="size-4 shrink-0 text-faint" />
+    </li>
+  );
+}
+
+function CompanyGroup({ group, deletingId, onDelete, onNewSession }) {
+  const { company, sessions } = group;
+  const count = `${sessions.length} ${sessions.length === 1 ? 'session' : 'sessions'}`;
+
+  return (
+    <Card>
+      <div className="flex items-center gap-3.5 border-b border-line px-5 py-4">
+        {company ? (
+          <CompanyLogo ticker={company.ticker} name={company.name} sector={company.sector} />
+        ) : (
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-line bg-canvas">
+            <MessagesSquare className="size-4 text-muted" />
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          {company ? (
+            <Link href={`/companies/${company._id}`} className="block truncate text-[15px] font-medium text-ink hover:underline hover:underline-offset-4">
+              {company.name}
+            </Link>
+          ) : (
+            <p className="text-[15px] font-medium text-ink">General research</p>
+          )}
+          <p className="mt-0.5 text-xs text-muted">
+            {company?.ticker && <span className="font-mono">{company.ticker} · </span>}
+            {count}
+          </p>
+        </div>
+        <Button size="sm" variant="secondary" icon={Plus} onClick={() => onNewSession(company?._id)}>
+          <span className="hidden sm:inline">New session</span>
+          <span className="sm:hidden">New</span>
+        </Button>
+      </div>
+      <ul className="divide-y divide-line">
+        {sessions.map((s) => (
+          <SessionRow key={s._id} session={s} deleting={deletingId === s._id} onDelete={onDelete} />
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
 export default function ResearchSessionsPage() {
   const [sessions, setSessions] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(null);
-  const [showForm, setShowForm] = useState(false);
+  // null = form hidden; otherwise the company to preselect ('' for general research).
+  const [formCompanyId, setFormCompanyId] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -97,6 +182,13 @@ export default function ResearchSessionsPage() {
       }
     })();
   }, []);
+
+  const groups = useMemo(() => groupSessionsByCompany(sessions), [sessions]);
+
+  const openForm = (companyId = '') => {
+    setFormCompanyId(companyId);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const handleDelete = async (session, e) => {
     e.preventDefault();
@@ -119,66 +211,38 @@ export default function ResearchSessionsPage() {
       <PageHeader
         title="Research chat"
         description="Conversations about a company, grounded in its filings and your documents."
-        actions={<Button icon={Plus} onClick={() => setShowForm((v) => !v)}>New session</Button>}
+        actions={<Button icon={Plus} onClick={() => (formCompanyId === null ? openForm() : setFormCompanyId(null))}>New session</Button>}
       />
 
-      {showForm && <NewSessionForm companies={companies} onCancel={() => setShowForm(false)} />}
+      {formCompanyId !== null && (
+        <NewSessionForm
+          key={formCompanyId}
+          companies={companies}
+          initialCompanyId={formCompanyId}
+          onCancel={() => setFormCompanyId(null)}
+        />
+      )}
 
-      <Card>
-        {loading ? (
-          <div className="divide-y divide-line">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center gap-4 px-5 py-4">
-                <Skeleton className="size-10 rounded-lg" />
-                <div className="flex-1 space-y-2"><Skeleton className="h-4 w-1/3" /><Skeleton className="h-3 w-1/4" /></div>
-              </div>
-            ))}
-          </div>
-        ) : sessions.length === 0 ? (
+      {loading ? (
+        <div className="space-y-4">
+          {[0, 1].map((i) => <Skeleton key={i} className="h-44 rounded-xl" />)}
+        </div>
+      ) : groups.length === 0 ? (
+        <Card>
           <EmptyState
             icon={MessagesSquare}
             title="No research sessions yet"
             description="Start a session to ask questions about a company and keep the answers in one place."
-            action={<Button size="sm" icon={Plus} onClick={() => setShowForm(true)}>New session</Button>}
+            action={<Button size="sm" icon={Plus} onClick={() => openForm()}>New session</Button>}
           />
-        ) : (
-          <ul className="divide-y divide-line">
-            {sessions.map((s) => {
-              const company = s.companyId;
-              return (
-                <li key={s._id} className="group relative flex items-center gap-4 px-5 py-4 transition-colors hover:bg-canvas">
-                  {company ? (
-                    <CompanyLogo ticker={company.ticker} name={company.name} sector={company.sector} />
-                  ) : (
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-line bg-canvas">
-                      <MessagesSquare className="size-4 text-muted" />
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <Link href={`/research/${s._id}`} className="block truncate text-sm font-medium text-ink after:absolute after:inset-0">
-                      {s.sessionName}
-                    </Link>
-                    <p className="mt-0.5 truncate text-xs text-muted">
-                      {company ? `${company.name} · ` : 'General research · '}
-                      {formatRelative(s.updatedAt || s.createdAt)}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => handleDelete(s, e)}
-                    disabled={deleting === s._id}
-                    aria-label={`Delete ${s.sessionName}`}
-                    className="relative z-10 flex size-8 items-center justify-center rounded-lg text-faint transition-[opacity,color,background-color] hover:bg-negative-soft hover:text-negative focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
-                  >
-                    {deleting === s._id ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-                  </button>
-                  <ChevronRight className="size-4 shrink-0 text-faint" />
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
+        </Card>
+      ) : (
+        <div className="animate-fade-up space-y-4">
+          {groups.map((g) => (
+            <CompanyGroup key={g.key} group={g} deletingId={deleting} onDelete={handleDelete} onNewSession={openForm} />
+          ))}
+        </div>
+      )}
     </PageContainer>
   );
 }
