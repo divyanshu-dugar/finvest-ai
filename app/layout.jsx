@@ -18,9 +18,21 @@ const googleSans = localFont({
   display: 'swap',
 });
 
+const SITE_DESCRIPTION = 'Read SEC filings, ask questions with cited answers, and build research on any public company.';
+
+// Icons (app/icon.svg, app/apple-icon.png) and the share image (app/opengraph-image.png)
+// are picked up from the app directory automatically.
 export const metadata = {
+  metadataBase: new URL('https://finvest-ai.tech'),
   title: 'Finvest AI | Company research, grounded in SEC filings',
-  description: 'Read SEC filings, ask questions with cited answers, and build research on any public company.',
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    type: 'website',
+    siteName: 'Finvest AI',
+    title: 'Finvest AI',
+    description: SITE_DESCRIPTION,
+  },
+  twitter: { card: 'summary_large_image' },
 };
 
 export const viewport = {
