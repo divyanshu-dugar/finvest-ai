@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import AuthLayout, { AuthLink } from '@/components/auth/AuthLayout';
 import PasswordInput from '@/components/auth/PasswordInput';
 import Button from '@/components/ui/Button';
@@ -12,7 +11,6 @@ export default function LoginPage() {
   const [form, setForm] = useState({ userName: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const router = useRouter();
   const { login } = useAuth();
 
   const handleChange = (e) => {
@@ -32,8 +30,7 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Sign in failed');
-      login(data.token, data.displayName || data.userName);
-      router.push('/dashboard');
+      login(data.token, data.displayName || data.userName, { onboarded: data.onboarded });
     } catch (err) {
       setError(err.message);
       setLoading(false);

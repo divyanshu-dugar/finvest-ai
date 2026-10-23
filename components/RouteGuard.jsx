@@ -9,7 +9,7 @@ import { AUTH_PATHS, PUBLIC_PATHS } from '@/lib/routes';
 export default function RouteGuard({ children }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, loading } = useAuth();
+  const { user, loading, nextPath } = useAuth();
 
   const isPublic = PUBLIC_PATHS.includes(pathname);
   const isAuthPage = AUTH_PATHS.includes(pathname);
@@ -17,8 +17,8 @@ export default function RouteGuard({ children }) {
   useEffect(() => {
     if (loading) return;
     if (!user && !isPublic) router.replace('/login');
-    else if (user && isAuthPage) router.replace('/dashboard');
-  }, [loading, user, isPublic, isAuthPage, router]);
+    else if (user && isAuthPage) router.replace(nextPath);
+  }, [loading, user, isPublic, isAuthPage, nextPath, router]);
 
   // Public pages render straight away (good for first paint); everything else waits for auth.
   const waiting = isPublic ? !loading && user && isAuthPage : loading || !user;

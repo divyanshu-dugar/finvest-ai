@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import AuthLayout, { AuthLink } from '@/components/auth/AuthLayout';
 import PasswordInput from '@/components/auth/PasswordInput';
 import Button from '@/components/ui/Button';
@@ -12,7 +11,6 @@ export default function RegisterPage() {
   const [form, setForm] = useState({ userName: '', password: '', confirmPassword: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const router = useRouter();
   const { login } = useAuth();
 
   const handleChange = (e) => {
@@ -36,8 +34,7 @@ export default function RegisterPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Could not create your account');
-      login(data.token, data.userName);
-      router.push('/dashboard');
+      login(data.token, data.userName, { onboarded: false });
     } catch (err) {
       setError(err.message);
       setLoading(false);

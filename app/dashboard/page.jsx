@@ -7,7 +7,6 @@ import { Building2, FileText, MessagesSquare, Plus, FileSearch, ArrowUpRight, Ch
 import { authenticatedFetch } from '@/lib/authenticate';
 import { formatRelative, greeting } from '@/lib/format';
 import { useAuth } from '@/context/AuthContext';
-import OnboardingModal from '@/components/OnboardingModal';
 import CompanyLogo from '@/components/company/CompanyLogo';
 import SectorBadge from '@/components/company/SectorBadge';
 import Button from '@/components/ui/Button';
@@ -85,7 +84,6 @@ export default function DashboardPage() {
 
   return (
     <PageContainer>
-      <OnboardingModal />
       <PageHeader
         title={`${greeting()}, ${user?.userName || ''}`}
         description={today}

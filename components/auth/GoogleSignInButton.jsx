@@ -2,7 +2,6 @@
 
 import { useCallback, useRef, useState } from 'react';
 import Script from 'next/script';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -15,7 +14,6 @@ export const isGoogleSignInEnabled = Boolean(CLIENT_ID);
  */
 export default function GoogleSignInButton({ onError }) {
   const containerRef = useRef(null);
-  const router = useRouter();
   const { login } = useAuth();
   const [pending, setPending] = useState(false);
 
@@ -29,13 +27,12 @@ export default function GoogleSignInButton({ onError }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Google sign-in failed');
-      login(data.token, data.displayName || data.userName);
-      router.push('/dashboard');
+      login(data.token, data.displayName || data.userName, { onboarded: data.onboarded });
     } catch (err) {
       onError?.(err.message);
       setPending(false);
     }
-  }, [login, onError, router]);
+  }, [login, onError]);
 
   const renderButton = useCallback(() => {
     const google = window.google;
