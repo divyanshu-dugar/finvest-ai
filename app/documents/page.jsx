@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { FileText, Plus, Trash2, Loader2, Download, Building2, Check, ExternalLink } from 'lucide-react';
-import { authenticatedFetch } from '@/lib/authenticate';
+import { apiError, authenticatedFetch } from '@/lib/authenticate';
 import { formatRelative } from '@/lib/format';
 import CompanyLogo from '@/components/company/CompanyLogo';
 import Button from '@/components/ui/Button';
@@ -228,12 +228,12 @@ export default function DocumentsPage() {
         body: JSON.stringify({ companyId: selectedCompany, docTypes: forms }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || data.error || 'Import failed');
+      if (!res.ok) throw apiError(res, data, 'Import failed');
       toast.success('Import started. This usually takes a minute or two.');
       setPanel(null);
       await fetchDocuments(selectedCompany, { quiet: true });
     } catch (err) {
-      toast.error(err.message);
+      if (!err.isQuota) toast.error(err.message);
     } finally {
       setImporting(false);
     }

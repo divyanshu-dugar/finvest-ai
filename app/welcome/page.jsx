@@ -6,7 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { ArrowLeft, ArrowRight, Volume2, VolumeX } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/authenticate';
-import { PLANS, QUESTIONS } from '@/lib/onboarding';
+import { QUESTIONS } from '@/lib/onboarding';
+import { PLANS } from '@/lib/plans';
 import { CONTACT_EMAIL } from '@/lib/site';
 import { isSoundEnabled, playCue, setSoundEnabled } from '@/lib/sounds';
 import { useAuth } from '@/context/AuthContext';
@@ -285,7 +286,7 @@ export default function WelcomePage() {
                   <StepHeading
                     eyebrow="Plans"
                     title="Choose how you'd like to start"
-                    description="Everything in Finvest AI is free while we're in beta. Paid plans are on the way."
+                    description="Start free and upgrade when you need more. Pro is coming soon; join the waitlist and we'll let you know."
                   />
                   <PlanStep selected={plan} onSelect={selectPlan} />
                 </>

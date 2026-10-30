@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Upload, FileText, Download, X, AlertCircle, Pencil, Check, RotateCcw, ScanLine } from 'lucide-react';
-import { authenticatedFetch, getToken } from '@/lib/authenticate';
+import { authenticatedFetch } from '@/lib/authenticate';
 import Button from '@/components/ui/Button';
 import { Card, CardHeader, EmptyState, PageContainer, PageHeader } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Field';
@@ -10,16 +10,6 @@ import { cn } from '@/lib/utils';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 const MAX_FILE_MB = 50;
-
-/**
- * Fetch wrapper for multipart uploads. It must not set Content-Type, so the browser can add
- * the multipart boundary itself.
- */
-function authenticatedFileFetch(url, options = {}) {
-  const token = getToken();
-  const headers = { ...(options.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) };
-  return fetch(url, { ...options, headers });
-}
 
 const PRESET_TABLES = [
   { label: 'Balance sheet', value: 'balance sheet' },
@@ -153,7 +143,7 @@ export default function ExtractPage() {
       const form = new FormData();
       form.append('file', file);
       form.append('tableType', effectiveTableType);
-      const res = await authenticatedFileFetch(`${API_URL}/api/extract/table`, { method: 'POST', body: form });
+      const res = await authenticatedFetch(`${API_URL}/api/extract/table`, { method: 'POST', body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || data.error || 'Extraction failed');
       setResult(data);

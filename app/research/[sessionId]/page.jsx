@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { ArrowLeft, ArrowUp, Loader2, MessagesSquare, Copy, Check, Quote } from 'lucide-react';
-import { authenticatedFetch } from '@/lib/authenticate';
+import { apiError, authenticatedFetch } from '@/lib/authenticate';
 import { LogoMark } from '@/components/Logo';
 import Markdown from '@/components/Markdown';
 import CompanyLogo from '@/components/company/CompanyLogo';
@@ -183,12 +183,12 @@ export default function ResearchChatPage() {
         body: JSON.stringify({ sessionId, message }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not get a response');
+      if (!res.ok) throw apiError(res, data, 'Could not get a response');
       setMessages((prev) => [...prev.filter((m) => m._id !== tempId), data.userMessage, data.assistantMessage]);
     } catch (err) {
       setMessages((prev) => prev.filter((m) => m._id !== tempId));
       setInput(message);
-      toast.error(err.message === 'Failed to fetch' ? 'Connection error. Please try again.' : err.message);
+      if (!err.isQuota) toast.error(err.message === 'Failed to fetch' ? 'Connection error. Please try again.' : err.message);
     } finally {
       setSending(false);
     }

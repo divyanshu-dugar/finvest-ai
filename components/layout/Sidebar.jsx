@@ -8,7 +8,9 @@ import {
   TableProperties, LogOut, Menu, X,
 } from 'lucide-react';
 import Logo from '@/components/Logo';
+import UsageBar from '@/components/account/UsageBar';
 import { useAuth } from '@/context/AuthContext';
+import { useAccount } from '@/context/AccountContext';
 import { cn } from '@/lib/utils';
 
 const NAV = [
@@ -35,6 +37,36 @@ const NAV = [
 function isActive(pathname, { href, match }) {
   const base = match || href;
   return pathname === base || pathname.startsWith(`${base}/`);
+}
+
+/** Compact plan + AI question usage, linking to the full Plan & usage page. */
+function PlanWidget({ onNavigate }) {
+  const { account } = useAccount();
+  const pathname = usePathname();
+  const usage = account?.usage;
+  const ai = usage?.meters.find((m) => m.key === 'aiQuestions');
+
+  return (
+    <Link
+      href="/account"
+      onClick={onNavigate}
+      aria-current={pathname === '/account' ? 'page' : undefined}
+      className={cn(
+        'mb-2 block rounded-lg border px-3 py-2.5 transition-colors',
+        pathname === '/account' ? 'border-line-strong bg-subtle' : 'border-line hover:bg-subtle/70',
+      )}
+    >
+      <div className="flex items-center justify-between text-xs">
+        <span className="font-medium text-ink">{usage ? `${usage.planName} plan` : 'Plan'}</span>
+        <span className="text-muted">Usage</span>
+      </div>
+      {ai ? (
+        <UsageBar compact label="AI questions" used={ai.used} limit={ai.limit} className="mt-2" />
+      ) : (
+        <div className="mt-2 h-[22px] animate-pulse rounded bg-subtle" />
+      )}
+    </Link>
+  );
 }
 
 function SidebarContent({ onNavigate }) {
@@ -86,6 +118,7 @@ function SidebarContent({ onNavigate }) {
       </nav>
 
       <div className="shrink-0 border-t border-line p-3">
+        <PlanWidget onNavigate={onNavigate} />
         <div className="flex items-center gap-3 rounded-lg px-2 py-1.5">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[13px] font-semibold uppercase text-brand-ink">
             {name.charAt(0) || '?'}

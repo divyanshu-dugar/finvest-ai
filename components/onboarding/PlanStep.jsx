@@ -1,5 +1,5 @@
 import { Check } from 'lucide-react';
-import { PLANS } from '@/lib/onboarding';
+import { PLANS } from '@/lib/plans';
 import { cn } from '@/lib/utils';
 
 /** Plan cards. Clicking a card selects it; the page's footer button commits the choice. */

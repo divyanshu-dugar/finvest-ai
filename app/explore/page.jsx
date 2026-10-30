@@ -7,7 +7,7 @@ import {
   Search, FileText, ExternalLink, Loader2, ArrowUp, BookmarkPlus, Check,
   MessagesSquare, X, AlertCircle, FileSearch,
 } from 'lucide-react';
-import { authenticatedFetch } from '@/lib/authenticate';
+import { apiError, authenticatedFetch } from '@/lib/authenticate';
 import { formatDate } from '@/lib/format';
 import { LogoMark } from '@/components/Logo';
 import Markdown from '@/components/Markdown';
@@ -664,10 +664,10 @@ export default function ExplorePage() {
         setMyCompanies((prev) => (prev.some((c) => c._id === data.company._id) ? prev : [data.company, ...prev]));
         toast.success(res.ok ? `${companyInfo.name} saved to your companies` : data.message);
       } else {
-        throw new Error(data.message || 'Could not save the company');
+        throw apiError(res, data, 'Could not save the company');
       }
     } catch (err) {
-      toast.error(err.message);
+      if (!err.isQuota) toast.error(err.message);
     } finally {
       setSavingCompany(false);
     }

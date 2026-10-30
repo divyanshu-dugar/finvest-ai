@@ -10,7 +10,7 @@ import {
   ShieldCheck, ScrollText,
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
-import { authenticatedFetch } from '@/lib/authenticate';
+import { apiError, authenticatedFetch } from '@/lib/authenticate';
 import { formatRelative } from '@/lib/format';
 import CompanyLogo from '@/components/company/CompanyLogo';
 import SectorBadge from '@/components/company/SectorBadge';
@@ -471,10 +471,10 @@ export default function CompanyProfile() {
         body: JSON.stringify({ companyId: id, companyName: company.name }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Generation failed');
+      if (!res.ok) throw apiError(res, data, 'Generation failed');
       setResult(data);
     } catch (err) {
-      toast.error(err.message);
+      if (!err.isQuota) toast.error(err.message);
     } finally {
       setBusy(false);
     }
