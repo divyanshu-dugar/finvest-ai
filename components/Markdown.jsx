@@ -1,6 +1,37 @@
 import ReactMarkdown from 'react-markdown';
+import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import 'katex/dist/katex.min.css';
 import { cn } from '@/lib/utils';
+
+const isFormula = (text) => /\\[a-zA-Z]|[=^]/.test(text);
+const oneLine = (text) => text.replace(/\s+/g, ' ').trim();
+
+/** Whether a line following this text belongs to a list, judged by the last unindented line. */
+function endsInList(text) {
+  const lines = text.split('\n').filter((line) => /^\S/.test(line));
+  return /^(?:[-*+]|\d+[.)])\s/.test(lines.at(-1) || '');
+}
+
+/**
+ * The model writes LaTeX between \[ \] and \( \), which Markdown would treat as escaped
+ * brackets. Rewrite both as $$ math. A display formula keeps its indent inside a list so it stays
+ * in that item; anywhere else the indent goes, because Markdown would make it a code block.
+ */
+function normalizeMath(text) {
+  return text
+    .replace(/^([ \t]*)(.*?)\\\[([\s\S]+?)\\\]/gm, (match, indent, before, tex, offset, whole) => {
+      if (!isFormula(tex)) return match;
+      const pad = endsInList(whole.slice(0, offset)) ? indent : '';
+      return `${pad}${before}\n\n${pad}$$\n${pad}${oneLine(tex)}\n${pad}$$\n`;
+    })
+    .replace(/\\\(([\s\S]+?)\\\)/g, (match, tex) => (isFormula(tex) ? `$$\\displaystyle ${oneLine(tex)}$$` : match));
+}
+
+// Single dollar signs stay plain text: in this app they're currency, not math.
+const remarkPlugins = [remarkGfm, [remarkMath, { singleDollarTextMath: false }]];
+const rehypePlugins = [[rehypeKatex, { fleqn: true, strict: 'ignore', errorColor: 'currentColor' }]];
 
 const components = {
   h1: ({ children }) => <h3 className="mb-2 mt-4 font-display text-base font-medium text-ink first:mt-0">{children}</h3>,
@@ -43,8 +74,8 @@ const components = {
 export default function Markdown({ children, className }) {
   return (
     <div className={cn('text-sm text-ink-2', className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-        {children || ''}
+      <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
+        {normalizeMath(children || '')}
       </ReactMarkdown>
     </div>
   );

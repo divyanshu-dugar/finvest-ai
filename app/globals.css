@@ -105,3 +105,15 @@
 @utility animate-fade-up {
   animation: fade-up 0.4s var(--ease-out-quint) both;
 }
+
+/* Formulas in AI answers: wide ones scroll on their own rather than stretching the page. */
+.katex-display {
+  margin: 0.5rem 0 0.75rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 0.125rem;
+}
+
+body .katex-display.fleqn > .katex {
+  padding-left: 0;
+}
