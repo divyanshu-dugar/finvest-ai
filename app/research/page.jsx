@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { MessagesSquare, Plus, Trash2, Loader2, ChevronRight } from 'lucide-react';
+import { MessagesSquare, Plus, Trash2, Loader2, ChevronRight, Pencil } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/authenticate';
 import { formatRelative } from '@/lib/format';
 import CompanyLogo from '@/components/company/CompanyLogo';
+import RenameInput from '@/components/research/RenameInput';
 import Button from '@/components/ui/Button';
 import { Card, CardHeader, EmptyState, PageContainer, PageHeader, Skeleton } from '@/components/ui/Card';
 import { Input, Label, Select } from '@/components/ui/Field';
@@ -94,15 +95,39 @@ function NewSessionForm({ companies, initialCompanyId, onCancel }) {
   );
 }
 
-function SessionRow({ session, deleting, onDelete }) {
+function SessionRow({ session, deleting, onDelete, onRenamed }) {
+  const [editing, setEditing] = useState(false);
+
   return (
     <li className="group relative flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-canvas">
       <div className="min-w-0 flex-1">
-        <Link href={`/research/${session._id}`} className="block truncate text-sm font-medium text-ink after:absolute after:inset-0">
-          {session.sessionName}
-        </Link>
+        {editing ? (
+          <RenameInput
+            sessionId={session._id}
+            name={session.sessionName}
+            className="relative z-10"
+            onDone={(name) => {
+              setEditing(false);
+              if (name) onRenamed(session._id, name);
+            }}
+          />
+        ) : (
+          <Link href={`/research/${session._id}`} className="block truncate text-sm font-medium text-ink after:absolute after:inset-0">
+            {session.sessionName}
+          </Link>
+        )}
         <p className="mt-0.5 text-xs text-muted">{formatRelative(session.updatedAt || session.createdAt)}</p>
       </div>
+      {!editing && (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          aria-label={`Rename ${session.sessionName}`}
+          className="relative z-10 flex size-8 items-center justify-center rounded-lg text-faint transition-[opacity,color,background-color] hover:bg-subtle hover:text-ink focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+        >
+          <Pencil className="size-4" />
+        </button>
+      )}
       <button
         type="button"
         onClick={(e) => onDelete(session, e)}
@@ -117,7 +142,7 @@ function SessionRow({ session, deleting, onDelete }) {
   );
 }
 
-function CompanyGroup({ group, deletingId, onDelete, onNewSession }) {
+function CompanyGroup({ group, deletingId, onDelete, onRenamed, onNewSession }) {
   const { company, sessions } = group;
   const count = `${sessions.length} ${sessions.length === 1 ? 'session' : 'sessions'}`;
 
@@ -151,7 +176,7 @@ function CompanyGroup({ group, deletingId, onDelete, onNewSession }) {
       </div>
       <ul className="divide-y divide-line">
         {sessions.map((s) => (
-          <SessionRow key={s._id} session={s} deleting={deletingId === s._id} onDelete={onDelete} />
+          <SessionRow key={s._id} session={s} deleting={deletingId === s._id} onDelete={onDelete} onRenamed={onRenamed} />
         ))}
       </ul>
     </Card>
@@ -188,6 +213,10 @@ export default function ResearchSessionsPage() {
   const openForm = (companyId = '') => {
     setFormCompanyId(companyId);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleRenamed = (id, sessionName) => {
+    setSessions((prev) => prev.map((s) => (s._id === id ? { ...s, sessionName } : s)));
   };
 
   const handleDelete = async (session, e) => {
@@ -239,7 +268,7 @@ export default function ResearchSessionsPage() {
       ) : (
         <div className="animate-fade-up space-y-4">
           {groups.map((g) => (
-            <CompanyGroup key={g.key} group={g} deletingId={deleting} onDelete={handleDelete} onNewSession={openForm} />
+            <CompanyGroup key={g.key} group={g} deletingId={deleting} onDelete={handleDelete} onRenamed={handleRenamed} onNewSession={openForm} />
           ))}
         </div>
       )}

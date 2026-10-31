@@ -1,18 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import {
   ArrowLeft, FileText, MessagesSquare, Globe, Loader2, Plus, RefreshCw, TrendingUp,
-  TrendingDown, AlertTriangle, Lightbulb, Info, Upload, ChevronRight, PieChart, LineChart as LineChartIcon,
-  ShieldCheck, ScrollText,
+  TrendingDown, AlertTriangle, Lightbulb, Info, Upload, ChevronRight, ShieldCheck, ScrollText,
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { apiError, authenticatedFetch } from '@/lib/authenticate';
 import { formatRelative } from '@/lib/format';
 import CompanyLogo from '@/components/company/CompanyLogo';
+import RatioGrid from '@/components/company/RatioGrid';
+import TrendChart from '@/components/company/TrendChart';
 import SectorBadge from '@/components/company/SectorBadge';
 import Markdown from '@/components/Markdown';
 import Button from '@/components/ui/Button';
@@ -91,15 +92,6 @@ function LoadingBlock({ className = 'h-48' }) {
     <div className={cn('flex items-center justify-center', className)}>
       <Loader2 className="size-5 animate-spin text-muted" />
     </div>
-  );
-}
-
-function AnalysisCard({ source, children }) {
-  return (
-    <Card className="animate-fade-up p-6">
-      <Markdown>{children}</Markdown>
-      <p className="mt-5 border-t border-line pt-3 text-xs text-faint">{source}</p>
-    </Card>
   );
 }
 
@@ -356,6 +348,7 @@ export default function CompanyProfile() {
   const [trend, setTrend] = useState(null);
   const [trendLoading, setTrendLoading] = useState(false);
   const [trendError, setTrendError] = useState('');
+  const trendKey = useRef('');
 
   const [swot, setSwot] = useState(null);
   const [swotLoading, setSwotLoading] = useState(false);
@@ -423,17 +416,30 @@ export default function CompanyProfile() {
     }
   };
 
-  const fetchTrend = async () => {
+  const fetchTrend = async (key) => {
+    trendKey.current = key;
     setTrendLoading(true);
     setTrendError('');
     try {
-      setTrend(await getJson(`/companies/${id}/trend?metric=${encodeURIComponent(trendMetric)}&years=${trendYears}`, 'Unable to load trend data'));
+      const data = await getJson(`/companies/${id}/trend?metric=${encodeURIComponent(trendMetric)}&years=${trendYears}`, 'Unable to load trend data');
+      if (trendKey.current === key) setTrend(data);
     } catch (err) {
-      setTrendError(err.message);
+      if (trendKey.current === key) {
+        setTrendError(err.message);
+        setTrend(null);
+        trendKey.current = '';
+      }
     } finally {
-      setTrendLoading(false);
+      if (trendKey.current === key || !trendKey.current) setTrendLoading(false);
     }
   };
+
+  // Ratios and trends are plain calculations, so they load as soon as their tab opens.
+  useEffect(() => {
+    if (activeTab === 'ratios' && !ratios && !ratiosLoading) fetchRatios();
+    const key = `${trendMetric}:${trendYears}`;
+    if (activeTab === 'trends' && trendKey.current !== key) fetchTrend(key);
+  }, [activeTab, trendMetric, trendYears]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     (async () => {
@@ -605,22 +611,10 @@ export default function CompanyProfile() {
         {activeTab === 'ratios' && (
           <div className="space-y-4">
             <ErrorNote>{ratiosError}</ErrorNote>
-            {ratios && !ratiosLoading ? (
-              <>
-                <div className="flex justify-end">
-                  <Button size="sm" variant="secondary" icon={RefreshCw} onClick={fetchRatios}>Refresh</Button>
-                </div>
-                <AnalysisCard source="Source: SEC XBRL data and live Finnhub price.">{ratios.result}</AnalysisCard>
-              </>
-            ) : (
-              <Card>
-                <EmptyState
-                  icon={PieChart}
-                  title={ratiosLoading ? 'Calculating ratios' : 'Financial ratios'}
-                  description="P/E, P/B, net margin, ROE, ROA, current ratio, debt to equity and more, from SEC XBRL data and the live share price."
-                  action={<Button icon={PieChart} loading={ratiosLoading} onClick={fetchRatios}>Calculate ratios</Button>}
-                />
-              </Card>
+            {ratios ? (
+              <RatioGrid data={ratios} loading={ratiosLoading} onRefresh={fetchRatios} />
+            ) : ratiosLoading && (
+              <Card><LoadingBlock className="h-96" /></Card>
             )}
           </div>
         )}
@@ -640,25 +634,12 @@ export default function CompanyProfile() {
                   {[3, 5, 7, 10].map((n) => <option key={n} value={n}>{n} years</option>)}
                 </Select>
               </div>
-              <Button icon={LineChartIcon} loading={trendLoading} onClick={fetchTrend}>
-                {trend ? 'Update' : 'Show trend'}
-              </Button>
             </Card>
             <ErrorNote>{trendError}</ErrorNote>
             {trendLoading ? (
-              <Card><LoadingBlock /></Card>
-            ) : trend ? (
-              <AnalysisCard source="Source: SEC XBRL data from annual 10-K filings.">{trend.result}</AnalysisCard>
-            ) : (
-              !trendError && (
-                <Card>
-                  <EmptyState
-                    icon={LineChartIcon}
-                    title="Multi-year history"
-                    description="Choose a metric to see its history from 10-K filings, with year-over-year change and CAGR."
-                  />
-                </Card>
-              )
+              <Card><LoadingBlock className="h-120" /></Card>
+            ) : trend && (
+              <TrendChart trend={trend} label={TREND_METRICS.find((m) => m.value === trend.metric)?.label || trend.metric} />
             )}
           </div>
         )}

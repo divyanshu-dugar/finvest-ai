@@ -93,17 +93,19 @@ export default function AccountPage() {
   }
 
   const { usage } = account;
-  const currentPlan = getPlanInfo(usage.plan);
+  const isAdmin = usage.plan === 'admin';
 
   return (
     <PageContainer size="lg">
       <PageHeader
         title="Plan & usage"
-        description={`You're on the ${currentPlan.name} plan. Monthly usage resets on ${formatDay(usage.resetsAt)}.`}
+        description={isAdmin
+          ? `Admin account: usage is tracked but never limited. Monthly counts reset on ${formatDay(usage.resetsAt)}.`
+          : `You're on the ${usage.planName} plan. Monthly usage resets on ${formatDay(usage.resetsAt)}.`}
       />
 
       <Card>
-        <CardHeader title="This month" description="What you've used against your plan's limits." />
+        <CardHeader title="This month" description={isAdmin ? "What you've used so far." : "What you've used against your plan's limits."} />
         <div className="grid gap-x-10 gap-y-6 p-5 sm:grid-cols-2">
           <UsageBar label="Company workspaces" used={usage.companies.used} limit={usage.companies.limit} />
           {usage.meters.map((m) => (
@@ -112,24 +114,26 @@ export default function AccountPage() {
         </div>
       </Card>
 
-      <Card className="mt-6">
-        <CardHeader
-          title="Plans"
-          description="Billing isn't live yet. Join the Pro waitlist and we'll let you know when it opens."
-        />
-        <div className="grid gap-4 p-5 md:grid-cols-3">
-          {['free', 'pro', 'enterprise'].map((id) => (
-            <PlanCard
-              key={id}
-              plan={getPlanInfo(id)}
-              current={usage.plan === id}
-              waitlisted={account.planInterest === 'pro'}
-              joining={joining}
-              onWaitlist={joinWaitlist}
-            />
-          ))}
-        </div>
-      </Card>
+      {!isAdmin && (
+        <Card className="mt-6">
+          <CardHeader
+            title="Plans"
+            description="Billing isn't live yet. Join the Pro waitlist and we'll let you know when it opens."
+          />
+          <div className="grid gap-4 p-5 md:grid-cols-3">
+            {['free', 'pro', 'enterprise'].map((id) => (
+              <PlanCard
+                key={id}
+                plan={getPlanInfo(id)}
+                current={usage.plan === id}
+                waitlisted={account.planInterest === 'pro'}
+                joining={joining}
+                onWaitlist={joinWaitlist}
+              />
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card className="mt-6">
         <CardHeader title="Account" />

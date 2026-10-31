@@ -29,58 +29,139 @@ const DOC_TYPES = [
 ];
 const DOCTYPE_LABELS = Object.fromEntries(DOC_TYPES.map((d) => [d.value, d.label]));
 
-const SEC_FORMS = [
-  { key: '10-K', label: '10-K', description: 'Annual report' },
-  { key: '10-Q', label: '10-Q', description: 'Quarterly report' },
-  { key: '8-K', label: '8-K', description: 'Current report' },
+const FILING_SECTIONS = [
+  { form: '10-K', title: 'Annual report' },
+  { form: '10-Q', title: 'Quarterly reports' },
+  { form: '8-K', title: 'Current reports' },
 ];
+const MAX_FILINGS = 5; // Matches the API's limit per import.
 
 const POLL_MS = 5000;
 
 const emptyForm = () => ({ title: '', docType: 'sec_10k', year: String(new Date().getFullYear()), sourceUrl: '', content: '' });
 
-function ImportPanel({ onImport, onCancel, importing }) {
-  const [forms, setForms] = useState(['10-K']);
-  const toggle = (key) => setForms((prev) => (prev.includes(key) ? prev.filter((f) => f !== key) : [...prev, key]));
+const formatDay = (date) =>
+  new Date(`${date}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+
+function filingPeriod({ form, reportDate, filingDate }) {
+  if (form === '10-K') return `Year ended ${formatDay(reportDate)}`;
+  if (form === '10-Q') return `Quarter ended ${formatDay(reportDate)}`;
+  return `Filed ${formatDay(filingDate)}`;
+}
+
+function FilingOption({ filing, selected, disabled, onToggle }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(filing)}
+      aria-pressed={selected}
+      disabled={filing.imported || disabled}
+      className={cn(
+        'flex w-full items-center gap-3 rounded-lg border px-3.5 py-2.5 text-left transition-colors disabled:cursor-not-allowed',
+        selected ? 'border-ink bg-canvas' : 'border-line enabled:hover:border-line-strong',
+        (filing.imported || disabled) && 'opacity-60',
+      )}
+    >
+      <span
+        className={cn(
+          'flex size-4.5 shrink-0 items-center justify-center rounded border transition-colors',
+          selected || filing.imported ? 'border-ink bg-ink text-white' : 'border-line-strong',
+        )}
+      >
+        {(selected || filing.imported) && <Check className="size-3" strokeWidth={3} />}
+      </span>
+      <span className="min-w-0 flex-1 text-[13px] font-medium text-ink">{filingPeriod(filing)}</span>
+      <span className="shrink-0 text-xs text-muted">
+        {filing.imported ? 'Imported' : filing.form === '8-K' ? '' : `Filed ${formatDay(filing.filingDate)}`}
+      </span>
+    </button>
+  );
+}
+
+function ImportPanel({ companyId, onImport, onCancel, importing }) {
+  const [filings, setFilings] = useState(null);
+  const [error, setError] = useState('');
+  const [year, setYear] = useState('');
+  const [selected, setSelected] = useState([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await authenticatedFetch(`${API_URL}/companies/${companyId}/filings`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        setFilings(data.filings);
+        // Open on the latest year with an annual report, the filing people want most often.
+        const start = data.filings.find((f) => f.form === '10-K') || data.filings[0];
+        setYear(start?.reportDate.slice(0, 4) || '');
+      } catch (err) {
+        setError(err.message || 'Could not load filings from the SEC');
+      }
+    })();
+  }, [companyId]);
+
+  const years = [...new Set((filings || []).map((f) => f.reportDate.slice(0, 4)))].sort().reverse();
+  const inYear = (filings || []).filter((f) => f.reportDate.startsWith(year));
+  const isSelected = (filing) => selected.some((f) => f.accessionNumber === filing.accessionNumber);
+  const toggle = (filing) => {
+    setSelected((prev) => (isSelected(filing)
+      ? prev.filter((f) => f.accessionNumber !== filing.accessionNumber)
+      : [...prev, filing]));
+  };
+  const atLimit = selected.length >= MAX_FILINGS;
 
   return (
     <Card className="mb-6 animate-fade-up">
-      <CardHeader title="Import SEC filings" description="Fetch the latest filings from SEC EDGAR and index them for search." />
+      <CardHeader
+        title="Import SEC filings"
+        description="Choose a year, then the filings you want. Each one becomes its own document."
+        action={years.length > 0 && (
+          <Select aria-label="Filing year" value={year} onChange={(e) => setYear(e.target.value)} className="w-28">
+            {years.map((y) => <option key={y} value={y}>{y}</option>)}
+          </Select>
+        )}
+      />
       <div className="p-5">
-        <div className="grid gap-2 sm:grid-cols-3">
-          {SEC_FORMS.map((f) => {
-            const selected = forms.includes(f.key);
-            return (
-              <button
-                key={f.key}
-                type="button"
-                onClick={() => toggle(f.key)}
-                aria-pressed={selected}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg border px-3.5 py-3 text-left transition-colors',
-                  selected ? 'border-ink bg-canvas' : 'border-line hover:border-line-strong',
-                )}
-              >
-                <span
-                  className={cn(
-                    'flex size-4.5 shrink-0 items-center justify-center rounded border transition-colors',
-                    selected ? 'border-ink bg-ink text-white' : 'border-line-strong',
+        {error ? (
+          <FieldError>{error}</FieldError>
+        ) : !filings ? (
+          <div className="flex h-40 items-center justify-center"><Loader2 className="size-5 animate-spin text-muted" /></div>
+        ) : filings.length === 0 ? (
+          <p className="text-sm text-muted">The SEC has no 10-K, 10-Q or 8-K filings for this company.</p>
+        ) : (
+          <div className="space-y-5">
+            {FILING_SECTIONS.map(({ form, title }) => {
+              const rows = inYear.filter((f) => f.form === form);
+              return (
+                <section key={form}>
+                  <h3 className="mb-2 flex items-baseline gap-2 text-[13px] font-medium text-ink">
+                    {title} <span className="font-mono text-xs font-normal text-muted">{form}</span>
+                  </h3>
+                  {rows.length === 0 ? (
+                    <p className="text-[13px] text-muted">None for {year}.</p>
+                  ) : (
+                    <div className="scrollbar-thin grid max-h-56 gap-1.5 overflow-y-auto sm:grid-cols-2">
+                      {rows.map((f) => (
+                        <FilingOption
+                          key={f.accessionNumber}
+                          filing={f}
+                          selected={isSelected(f)}
+                          disabled={atLimit && !isSelected(f)}
+                          onToggle={toggle}
+                        />
+                      ))}
+                    </div>
                   )}
-                >
-                  {selected && <Check className="size-3" strokeWidth={3} />}
-                </span>
-                <span>
-                  <span className="block font-mono text-sm font-medium text-ink">{f.label}</span>
-                  <span className="block text-xs text-muted">{f.description}</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="mt-5 flex justify-end gap-2">
+                </section>
+              );
+            })}
+          </div>
+        )}
+        <div className="mt-5 flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+          <p className="mr-auto text-xs text-muted">Up to {MAX_FILINGS} filings at a time. Each counts as one import.</p>
           <Button variant="secondary" onClick={onCancel}>Cancel</Button>
-          <Button icon={Download} loading={importing} disabled={forms.length === 0} onClick={() => onImport(forms)}>
-            Import {forms.join(', ')}
+          <Button icon={Download} loading={importing} disabled={selected.length === 0} onClick={() => onImport(selected)}>
+            {selected.length === 0 ? 'Import' : `Import ${selected.length} ${selected.length === 1 ? 'filing' : 'filings'}`}
           </Button>
         </div>
       </div>
@@ -146,6 +227,46 @@ function AddDocumentPanel({ companyId, onAdded, onCancel }) {
           <Button type="submit" loading={saving}>Add and index</Button>
         </div>
       </form>
+    </Card>
+  );
+}
+
+function DocumentCard({ doc, deleting, onDelete }) {
+  return (
+    <Card className="flex h-full flex-col p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex h-9 min-w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-canvas px-1.5">
+          {doc.form ? <span className="font-mono text-[11px] font-medium text-ink-2">{doc.form}</span> : <FileText className="size-4 text-muted" />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium leading-snug text-ink">{doc.title}</p>
+          <p className="mt-1 text-xs text-muted">
+            {[DOCTYPE_LABELS[doc.docType] || doc.docType, doc.status === 'completed' && `${doc.chunkCount || 0} sections`, formatRelative(doc.createdAt)]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onDelete(doc)}
+          disabled={deleting}
+          aria-label={`Delete ${doc.title}`}
+          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-faint transition-colors hover:bg-negative-soft hover:text-negative disabled:opacity-50"
+        >
+          {deleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+        </button>
+      </div>
+      {doc.status === 'failed' && doc.excerpt && (
+        <p className="mt-2 line-clamp-2 text-xs text-negative" title={doc.excerpt}>{doc.excerpt}</p>
+      )}
+      <div className="mt-auto flex items-center justify-between gap-3 pt-3">
+        <StatusBadge status={doc.status} />
+        {doc.sourceUrl && (
+          <a href={doc.sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-ink-2 hover:text-ink">
+            Source <ExternalLink className="size-3" />
+          </a>
+        )}
+      </div>
     </Card>
   );
 }
@@ -220,12 +341,12 @@ export default function DocumentsPage() {
     }
   };
 
-  const handleImport = async (forms) => {
+  const handleImport = async (filings) => {
     setImporting(true);
     try {
       const res = await authenticatedFetch(`${API_URL}/documents/ingest`, {
         method: 'POST',
-        body: JSON.stringify({ companyId: selectedCompany, docTypes: forms }),
+        body: JSON.stringify({ companyId: selectedCompany, filings }),
       });
       const data = await res.json();
       if (!res.ok) throw apiError(res, data, 'Import failed');
@@ -276,7 +397,7 @@ export default function DocumentsPage() {
       )}
 
       {panel === 'import' && (
-        <ImportPanel importing={importing} onImport={handleImport} onCancel={() => setPanel(null)} />
+        <ImportPanel key={selectedCompany} companyId={selectedCompany} importing={importing} onImport={handleImport} onCancel={() => setPanel(null)} />
       )}
       {panel === 'add' && (
         <AddDocumentPanel
@@ -291,69 +412,37 @@ export default function DocumentsPage() {
         />
       )}
 
-      <Card>
-        {!loadingCompanies && companies.length === 0 ? (
+      {!loadingCompanies && companies.length === 0 ? (
+        <Card>
           <EmptyState
             icon={Building2}
             title="No companies yet"
             description="Documents belong to a company. Add one first."
             action={<Button href="/companies/add" size="sm" icon={Plus}>Add company</Button>}
           />
-        ) : loadingDocs || loadingCompanies ? (
-          <div className="divide-y divide-line">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="flex items-center gap-4 px-5 py-4">
-                <Skeleton className="size-9 rounded-lg" />
-                <div className="flex-1 space-y-2"><Skeleton className="h-4 w-1/2" /><Skeleton className="h-3 w-1/3" /></div>
-              </div>
-            ))}
-          </div>
-        ) : documents.length === 0 ? (
+        </Card>
+      ) : loadingDocs || loadingCompanies ? (
+        <div className="grid gap-3 md:grid-cols-2">
+          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
+        </div>
+      ) : documents.length === 0 ? (
+        <Card>
           <EmptyState
             icon={FileText}
             title={`No documents for ${currentCompany?.name || 'this company'} yet`}
             description="Import filings from SEC EDGAR, or add a document by pasting its text."
             action={<Button size="sm" variant="secondary" icon={Download} onClick={() => setPanel('import')}>Import SEC filings</Button>}
           />
-        ) : (
-          <ul className="divide-y divide-line">
-            {documents.map((doc) => (
-              <li key={doc._id} className="flex items-center gap-4 px-5 py-4">
-                <div className="hidden size-9 shrink-0 items-center justify-center rounded-lg border border-line bg-canvas sm:flex">
-                  <FileText className="size-4 text-muted" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-ink">{doc.title}</p>
-                  <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
-                    <span>{DOCTYPE_LABELS[doc.docType] || doc.docType}</span>
-                    {doc.year && <span>· {doc.year}</span>}
-                    {doc.status === 'completed' && <span>· {doc.chunkCount || 0} sections indexed</span>}
-                    <span>· {formatRelative(doc.createdAt)}</span>
-                    {doc.sourceUrl && (
-                      <a href={doc.sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-ink-2 hover:text-ink">
-                        · Source <ExternalLink className="size-3" />
-                      </a>
-                    )}
-                  </p>
-                  {doc.status === 'failed' && doc.excerpt && (
-                    <p className="mt-1 truncate text-xs text-negative" title={doc.excerpt}>{doc.excerpt}</p>
-                  )}
-                </div>
-                <StatusBadge status={doc.status} className="shrink-0" />
-                <button
-                  type="button"
-                  onClick={() => handleDelete(doc)}
-                  disabled={deleting === doc._id}
-                  aria-label={`Delete ${doc.title}`}
-                  className="flex size-8 shrink-0 items-center justify-center rounded-lg text-faint transition-colors hover:bg-negative-soft hover:text-negative disabled:opacity-50"
-                >
-                  {deleting === doc._id ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+        </Card>
+      ) : (
+        <ul className="grid gap-3 md:grid-cols-2">
+          {documents.map((doc) => (
+            <li key={doc._id}>
+              <DocumentCard doc={doc} deleting={deleting === doc._id} onDelete={handleDelete} />
+            </li>
+          ))}
+        </ul>
+      )}
     </PageContainer>
   );
 }

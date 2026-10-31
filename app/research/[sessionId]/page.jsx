@@ -4,11 +4,13 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { ArrowLeft, ArrowUp, Loader2, MessagesSquare, Copy, Check, Quote } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Loader2, MessagesSquare, Copy, Check, Pencil, Quote } from 'lucide-react';
 import { apiError, authenticatedFetch } from '@/lib/authenticate';
 import { LogoMark } from '@/components/Logo';
 import Markdown from '@/components/Markdown';
 import CompanyLogo from '@/components/company/CompanyLogo';
+import RenameInput from '@/components/research/RenameInput';
+import { AttachButton, AttachedDocuments, useSessionDocuments } from '@/components/research/SessionDocuments';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -113,6 +115,8 @@ export default function ResearchChatPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [renamed, setRenamed] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const sessionDocuments = useSessionDocuments(session);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -228,8 +232,35 @@ export default function ResearchChatPage() {
             <MessagesSquare className="size-4 text-muted" />
           </div>
         )}
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-ink">{session?.sessionName || 'Research session'}</p>
+        <div className="min-w-0 flex-1">
+          {editingName ? (
+            <RenameInput
+              sessionId={sessionId}
+              name={session.sessionName}
+              className="max-w-md"
+              onDone={(name) => {
+                setEditingName(false);
+                if (name) {
+                  setSession((prev) => ({ ...prev, sessionName: name }));
+                  setRenamed(true);
+                }
+              }}
+            />
+          ) : (
+            <div className="flex items-center gap-1">
+              <p className="truncate text-sm font-medium text-ink">{session?.sessionName || 'Research session'}</p>
+              {session && (
+                <button
+                  type="button"
+                  onClick={() => setEditingName(true)}
+                  aria-label="Rename session"
+                  className="flex size-6 shrink-0 items-center justify-center rounded-md text-faint transition-colors hover:bg-subtle hover:text-ink"
+                >
+                  <Pencil className="size-3.5" />
+                </button>
+              )}
+            </div>
+          )}
           {company && (
             <Link href={`/companies/${company._id}`} className="block truncate text-xs text-muted hover:text-ink">
               {company.name}{company.ticker ? ` · ${company.ticker}` : ''}
@@ -247,7 +278,7 @@ export default function ResearchChatPage() {
                 What would you like to know{company ? ` about ${company.name}` : ''}?
               </h2>
               <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted">
-                Answers draw on SEC data and your indexed documents, and cite where they came from.
+                Attach filings with the + button so answers can quote them. SEC figures, ratios and trends work without one.
               </p>
               <div className="mx-auto mt-8 grid max-w-xl gap-2 text-left sm:grid-cols-2">
                 {suggestedQuestions(company).map((q) => (
@@ -276,28 +307,42 @@ export default function ResearchChatPage() {
       <div className="shrink-0 border-t border-line bg-canvas px-4 pb-4 pt-3 sm:px-6">
         <form
           onSubmit={(e) => { e.preventDefault(); send(input); }}
-          className="mx-auto flex w-full max-w-3xl items-end gap-2 rounded-2xl border border-line bg-surface p-2 shadow-card transition-[border-color,box-shadow] focus-within:border-brand focus-within:ring-3 focus-within:ring-brand/15"
+          className="mx-auto w-full max-w-3xl rounded-2xl border border-line bg-surface p-2 shadow-card transition-[border-color,box-shadow] focus-within:border-brand focus-within:ring-3 focus-within:ring-brand/15"
         >
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => { setInput(e.target.value); resizeInput(); }}
-            onKeyDown={handleKeyDown}
-            placeholder={`Ask about ${company?.name || 'a company'}`}
-            rows={1}
-            aria-label="Message"
-            className="max-h-40 min-h-10 flex-1 resize-none bg-transparent px-2.5 py-2 text-[15px] leading-normal text-ink outline-none placeholder:text-faint"
-          />
-          <button
-            type="submit"
-            disabled={!input.trim() || sending}
-            aria-label="Send"
-            className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-ink text-white transition-colors hover:bg-ink-2 disabled:bg-line-strong"
-          >
-            {sending ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
-          </button>
+          <AttachedDocuments documents={sessionDocuments.attached} onRemove={sessionDocuments.toggle} />
+          <div className="flex items-end gap-1">
+            <AttachButton
+              documents={sessionDocuments.documents}
+              attachedIds={sessionDocuments.attachedIds}
+              onToggle={sessionDocuments.toggle}
+              onOpen={sessionDocuments.reload}
+              company={company}
+            />
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => { setInput(e.target.value); resizeInput(); }}
+              onKeyDown={handleKeyDown}
+              placeholder={`Ask about ${company?.name || 'a company'}`}
+              rows={1}
+              aria-label="Message"
+              className="max-h-40 min-h-10 flex-1 resize-none bg-transparent px-1.5 py-2 text-[15px] leading-normal text-ink outline-none placeholder:text-faint"
+            />
+            <button
+              type="submit"
+              disabled={!input.trim() || sending}
+              aria-label="Send"
+              className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-ink text-white transition-colors hover:bg-ink-2 disabled:bg-line-strong"
+            >
+              {sending ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
+            </button>
+          </div>
         </form>
-        <p className="mt-2 text-center text-xs text-faint">Enter to send, Shift + Enter for a new line</p>
+        <p className="mt-2 text-center text-xs text-faint">
+          {sessionDocuments.attached.length === 0
+            ? 'No documents attached yet. Press + to choose what the AI can read.'
+            : 'Enter to send, Shift + Enter for a new line'}
+        </p>
       </div>
     </div>
   );
