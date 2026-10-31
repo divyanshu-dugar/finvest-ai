@@ -261,7 +261,7 @@ function MetricsTab({ groups, loading, error, onReload, selectedKey, detail, det
           ) : detailError ? (
             <ErrorNote>{detailError}</ErrorNote>
           ) : detail ? (
-            <p className="animate-fade-up whitespace-pre-wrap text-sm leading-relaxed text-ink-2">{detail.explanation}</p>
+            <div className="animate-fade-up"><Markdown>{detail.explanation}</Markdown></div>
           ) : null}
         </div>
       </Card>
@@ -294,7 +294,7 @@ function SwotGrid({ swot }) {
                   {items.map((item, i) => (
                     <li key={i} className="flex gap-2 text-[13px] leading-relaxed text-ink-2">
                       <span className="mt-2 size-1 shrink-0 rounded-full bg-line-strong" />
-                      {item}
+                      <Markdown className="min-w-0 flex-1 text-[13px]">{item}</Markdown>
                     </li>
                   ))}
                 </ul>
@@ -308,7 +308,7 @@ function SwotGrid({ swot }) {
       {swot.summary && (
         <Card className="mt-4 p-5">
           <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-faint">Overall</p>
-          <p className="mt-2 text-sm leading-relaxed text-ink-2">{swot.summary}</p>
+          <Markdown className="mt-2">{swot.summary}</Markdown>
         </Card>
       )}
     </div>

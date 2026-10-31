@@ -6,6 +6,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { ArrowLeft, ArrowUp, Loader2, MessagesSquare, Copy, Check, Pencil, Quote } from 'lucide-react';
 import { apiError, authenticatedFetch } from '@/lib/authenticate';
+import { stripMarkdown } from '@/lib/format';
 import { LogoMark } from '@/components/Logo';
 import Markdown from '@/components/Markdown';
 import CompanyLogo from '@/components/company/CompanyLogo';
@@ -29,7 +30,7 @@ function AssistantMessage({ content }) {
   const { cleanText, citations } = parseCitations(content);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(content);
+    await navigator.clipboard.writeText(stripMarkdown(content));
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
