@@ -48,8 +48,7 @@ export default function PrivacyPage() {
             <strong>OpenAI</strong> processes the text of your questions, relevant excerpts of documents and filings, and
             document text sent for search indexing, in order to generate answers and embeddings.
           </li>
-          <li><strong>MongoDB Atlas</strong> stores your account, companies, documents and research sessions.</li>
-          <li><strong>Qdrant Cloud</strong> stores searchable representations of your documents.</li>
+          <li><strong>MongoDB Atlas</strong> stores your account, companies, documents, research sessions and searchable representations of your documents.</li>
           <li><strong>Vercel</strong> and <strong>Render</strong> host the website and application servers.</li>
           <li><strong>Google</strong> handles authentication if you choose to sign in with Google.</li>
           <li>
