@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { FileText, Plus, Trash2, Loader2, Download, Building2, Check, ExternalLink } from 'lucide-react';
@@ -9,6 +9,7 @@ import { formatRelative } from '@/lib/format';
 import CompanyLogo from '@/components/company/CompanyLogo';
 import Button from '@/components/ui/Button';
 import StatusBadge from '@/components/ui/StatusBadge';
+import { progressToast } from '@/components/ui/ProgressToast';
 import { Card, CardHeader, EmptyState, PageContainer, PageHeader, Skeleton } from '@/components/ui/Card';
 import { FieldError, Input, Label, Select, Textarea } from '@/components/ui/Field';
 import { cn } from '@/lib/utils';
@@ -327,6 +328,21 @@ export default function DocumentsPage() {
     return () => clearInterval(id);
   }, [hasProcessing, selectedCompany, fetchDocuments]);
 
+  // The "import started" toast closes early once every document it started has finished.
+  const importToast = useRef(null);
+  useEffect(() => {
+    const pending = importToast.current;
+    if (!pending) return;
+    const done = pending.documentIds.every((docId) => {
+      const doc = documents.find((d) => d._id === docId);
+      return doc && doc.status !== 'processing';
+    });
+    if (done) {
+      toast.dismiss(pending.id);
+      importToast.current = null;
+    }
+  }, [documents]);
+
   const handleDelete = async (doc) => {
     if (!confirm(`Remove "${doc.title}" and its search index?`)) return;
     setDeleting(doc._id);
@@ -350,7 +366,14 @@ export default function DocumentsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw apiError(res, data, 'Import failed');
-      toast.success('Import started. This usually takes a minute or two.');
+      if (importToast.current) toast.dismiss(importToast.current.id);
+      importToast.current = data.documentIds?.length
+        ? {
+            id: progressToast('Import started. This usually takes a minute or two.', { duration: 20000 }),
+            documentIds: data.documentIds,
+          }
+        : null;
+      if (!importToast.current) toast.success('Those filings are already imported.');
       setPanel(null);
       await fetchDocuments(selectedCompany, { quiet: true });
     } catch (err) {

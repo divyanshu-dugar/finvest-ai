@@ -106,6 +106,20 @@
   animation: fade-up 0.4s var(--ease-out-quint) both;
 }
 
+/* Countdown bar in a timed toast: shrinks from full width to nothing. Duration is set inline. */
+@keyframes countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@utility animate-countdown {
+  animation: countdown 15s linear forwards;
+}
+
 /* Formulas in AI answers: wide ones scroll on their own rather than stretching the page. */
 .katex-display {
   margin: 0.5rem 0 0.75rem;
