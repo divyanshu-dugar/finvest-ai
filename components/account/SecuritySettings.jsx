@@ -4,6 +4,7 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { CheckCircle2, Clock } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/authenticate';
+import { useAuth } from '@/context/AuthContext';
 import PasswordInput from '@/components/auth/PasswordInput';
 import Button from '@/components/ui/Button';
 import { Card, CardHeader } from '@/components/ui/Card';
@@ -31,6 +32,89 @@ function Row({ label, children, action }) {
       </div>
       {action && <div className="shrink-0">{action}</div>}
     </div>
+  );
+}
+
+function UserNameSection({ account, onChange }) {
+  const { login } = useAuth();
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({ userName: '', password: '' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const close = () => {
+    setEditing(false);
+    setError('');
+    setForm({ userName: '', password: '' });
+  };
+
+  const save = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const data = await callMe('/username', 'PUT', { userName: form.userName, password: form.password });
+      // Keep the signed-in session in step with the new name (the sidebar and greeting read it).
+      login(data.token, data.displayName || data.userName);
+      await onChange();
+      toast.success(`Your username is now ${data.userName}.`);
+      close();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <Row
+        label="Username"
+        action={!editing && (
+          <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>Change</Button>
+        )}
+      >
+        <span className="break-all">{account.userName}</span>
+      </Row>
+
+      {editing && (
+        <form onSubmit={save} className="mx-5 mb-5 space-y-4 rounded-lg border border-line bg-subtle/50 p-4">
+          <div>
+            <Label htmlFor="new-username">New username</Label>
+            <Input
+              id="new-username"
+              value={form.userName}
+              onChange={(e) => { setForm({ ...form, userName: e.target.value }); if (error) setError(''); }}
+              autoComplete="username"
+              minLength={3}
+              maxLength={30}
+              pattern="[A-Za-z0-9_]+"
+              title="Letters, numbers and underscores only"
+              required
+              autoFocus
+            />
+            <p className="mt-1.5 text-xs text-muted">3 to 30 letters, numbers or underscores. You'll sign in with the new one.</p>
+          </div>
+          {account.hasPassword && (
+            <div>
+              <Label htmlFor="username-password" hint="to confirm it's you">Current password</Label>
+              <PasswordInput
+                id="username-password"
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                autoComplete="current-password"
+                required
+              />
+            </div>
+          )}
+          <FieldError>{error}</FieldError>
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" loading={saving}>Change username</Button>
+            <Button variant="ghost" size="sm" onClick={close}>Cancel</Button>
+          </div>
+        </form>
+      )}
+    </>
   );
 }
 
@@ -251,12 +335,14 @@ function PasswordSection({ account, onChange }) {
   );
 }
 
-/** Email and password management on the account page. */
+/** Name, username, email and password on the account page. */
 export default function SecuritySettings({ account, onChange }) {
   return (
     <Card className="mt-6">
-      <CardHeader title="Sign-in and security" description="Your email is used for password resets and important account notices." />
+      <CardHeader title="Account and sign-in" description="Your email is used for password resets and important account notices." />
       <div className="divide-y divide-line">
+        {account.displayName && <Row label="Name">{account.displayName}</Row>}
+        <div><UserNameSection account={account} onChange={onChange} /></div>
         <div><EmailSection account={account} onChange={onChange} /></div>
         <div><PasswordSection account={account} onChange={onChange} /></div>
       </div>

@@ -136,21 +136,6 @@ export default function AccountPage() {
         </Card>
       )}
 
-      <Card className="mt-6">
-        <CardHeader title="Account" />
-        <dl className="divide-y divide-line text-sm">
-          {[
-            ['Username', account.userName],
-            ['Name', account.displayName],
-          ].filter(([, v]) => v).map(([label, value]) => (
-            <div key={label} className="flex items-center justify-between gap-4 px-5 py-3.5">
-              <dt className="text-muted">{label}</dt>
-              <dd className="truncate text-ink">{value}</dd>
-            </div>
-          ))}
-        </dl>
-      </Card>
-
       <SecuritySettings account={account} onChange={refresh} />
     </PageContainer>
   );
