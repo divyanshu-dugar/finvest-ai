@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext';
 import CompanyLogo from '@/components/company/CompanyLogo';
 import SectorBadge from '@/components/company/SectorBadge';
 import Button from '@/components/ui/Button';
+import ViewSwitch from '@/components/admin/ViewSwitch';
 import { Card, CardHeader, EmptyState, PageContainer, PageHeader, Skeleton } from '@/components/ui/Card';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -89,6 +90,7 @@ export default function DashboardPage() {
         description={today}
         actions={
           <>
+            <ViewSwitch />
             <Button href="/explore" variant="secondary" icon={FileSearch}>SEC Explorer</Button>
             <Button href="/companies/add" icon={Plus}>Add company</Button>
           </>

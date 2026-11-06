@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, FileSearch, Building2, FileText, MessagesSquare,
-  TableProperties, LogOut, Menu, X,
+  TableProperties, LogOut, Menu, X, ShieldCheck,
 } from 'lucide-react';
 import Logo from '@/components/Logo';
 import UsageBar from '@/components/account/UsageBar';
@@ -33,6 +33,9 @@ const NAV = [
     ],
   },
 ];
+
+// Shown only to admin accounts.
+const ADMIN_NAV = { title: 'Admin', items: [{ label: 'Admin dashboard', href: '/admin', icon: ShieldCheck }] };
 
 function isActive(pathname, { href, match }) {
   const base = match || href;
@@ -73,7 +76,9 @@ function SidebarContent({ onNavigate }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { account } = useAccount();
   const name = user?.userName || '';
+  const nav = account?.usage?.plan === 'admin' ? [...NAV, ADMIN_NAV] : NAV;
 
   const handleLogout = () => {
     logout();
@@ -87,7 +92,7 @@ function SidebarContent({ onNavigate }) {
       </div>
 
       <nav aria-label="Main" className="scrollbar-thin flex-1 space-y-6 overflow-y-auto px-3 py-3">
-        {NAV.map((group, i) => (
+        {nav.map((group, i) => (
           <div key={group.title || i}>
             {group.title && (
               <p className="mb-1.5 px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-faint">{group.title}</p>
