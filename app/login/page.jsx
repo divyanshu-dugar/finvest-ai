@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import AuthLayout, { AuthLink } from '@/components/auth/AuthLayout';
 import PasswordInput from '@/components/auth/PasswordInput';
 import Button from '@/components/ui/Button';
@@ -12,6 +13,12 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { login } = useAuth();
+
+  // After a password reset, the username arrives in the URL so it doesn't have to be remembered.
+  useEffect(() => {
+    const userName = new URLSearchParams(window.location.search).get('userName');
+    if (userName) setForm((f) => ({ ...f, userName }));
+  }, []);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -50,7 +57,12 @@ export default function LoginPage() {
           <Input id="userName" name="userName" value={form.userName} onChange={handleChange} autoComplete="username" required />
         </div>
         <div>
-          <Label htmlFor="password">Password</Label>
+          <div className="mb-1.5 flex items-baseline justify-between">
+            <Label htmlFor="password" className="mb-0">Password</Label>
+            <Link href="/forgot-password" className="text-[13px] text-muted underline-offset-4 hover:text-ink hover:underline">
+              Forgot password?
+            </Link>
+          </div>
           <PasswordInput id="password" name="password" value={form.password} onChange={handleChange} autoComplete="current-password" required />
         </div>
         <FieldError>{error}</FieldError>

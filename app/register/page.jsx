@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 import AuthLayout, { AuthLink } from '@/components/auth/AuthLayout';
 import PasswordInput from '@/components/auth/PasswordInput';
 import Button from '@/components/ui/Button';
@@ -8,7 +9,7 @@ import { Input, Label, FieldError } from '@/components/ui/Field';
 import { useAuth } from '@/context/AuthContext';
 
 export default function RegisterPage() {
-  const [form, setForm] = useState({ userName: '', password: '', confirmPassword: '' });
+  const [form, setForm] = useState({ userName: '', email: '', password: '', confirmPassword: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { login } = useAuth();
@@ -30,10 +31,13 @@ export default function RegisterPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userName: form.userName, password: form.password }),
+        body: JSON.stringify({ userName: form.userName, email: form.email, password: form.password }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Could not create your account');
+      if (data.emailVerificationSent) {
+        toast.success(`We sent a confirmation link to ${form.email.trim()}.`, { duration: 6000 });
+      }
       login(data.token, data.userName, { onboarded: false });
     } catch (err) {
       setError(err.message);
@@ -63,6 +67,11 @@ export default function RegisterPage() {
             title="Letters, numbers and underscores only"
             required
           />
+        </div>
+        <div>
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" name="email" type="email" value={form.email} onChange={handleChange} autoComplete="email" required />
+          <p className="mt-1.5 text-xs text-muted">We'll send a link to confirm it. It's how you reset a forgotten password.</p>
         </div>
         <div>
           <Label htmlFor="password">Password</Label>

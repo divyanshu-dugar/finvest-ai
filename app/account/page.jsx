@@ -8,6 +8,7 @@ import { getPlanInfo } from '@/lib/plans';
 import { CONTACT_EMAIL } from '@/lib/site';
 import { useAccount } from '@/context/AccountContext';
 import UsageBar from '@/components/account/UsageBar';
+import SecuritySettings from '@/components/account/SecuritySettings';
 import Button from '@/components/ui/Button';
 import { Card, CardHeader, PageContainer, PageHeader, Skeleton } from '@/components/ui/Card';
 import { cn } from '@/lib/utils';
@@ -141,7 +142,6 @@ export default function AccountPage() {
           {[
             ['Username', account.userName],
             ['Name', account.displayName],
-            ['Email', account.email || 'Not added yet'],
           ].filter(([, v]) => v).map(([label, value]) => (
             <div key={label} className="flex items-center justify-between gap-4 px-5 py-3.5">
               <dt className="text-muted">{label}</dt>
@@ -150,6 +150,8 @@ export default function AccountPage() {
           ))}
         </dl>
       </Card>
+
+      <SecuritySettings account={account} onChange={refresh} />
     </PageContainer>
   );
 }

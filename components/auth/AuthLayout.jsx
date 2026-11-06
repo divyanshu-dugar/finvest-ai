@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Logo from '@/components/Logo';
 import GoogleSignInButton, { isGoogleSignInEnabled } from '@/components/auth/GoogleSignInButton';
 
-export default function AuthLayout({ title, description, footer, onGoogleError, children }) {
+export default function AuthLayout({ title, description, footer, onGoogleError, showGoogle = true, children }) {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="mx-auto flex h-16 w-full max-w-6xl items-center px-4 sm:px-6">
@@ -17,7 +17,7 @@ export default function AuthLayout({ title, description, footer, onGoogleError, 
           </div>
 
           <div className="mt-8 rounded-2xl border border-line bg-surface p-6 shadow-card sm:p-7">
-            {isGoogleSignInEnabled && (
+            {showGoogle && isGoogleSignInEnabled && (
               <>
                 <GoogleSignInButton onError={onGoogleError} />
                 <div className="my-6 flex items-center gap-3 text-xs text-faint">
@@ -30,7 +30,7 @@ export default function AuthLayout({ title, description, footer, onGoogleError, 
             {children}
           </div>
 
-          <p className="mt-6 text-center text-sm text-muted">{footer}</p>
+          {footer && <p className="mt-6 text-center text-sm text-muted">{footer}</p>}
         </div>
       </main>
     </div>
