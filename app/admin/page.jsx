@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 import { Search, ShieldAlert, Users } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/authenticate';
 import { formatDate, formatRelative } from '@/lib/format';
@@ -63,6 +64,34 @@ function Num({ value }) {
 
 const TH = 'whitespace-nowrap px-4 py-2.5 text-left text-xs font-medium text-muted';
 const TD = 'whitespace-nowrap px-4 py-3 align-top';
+const STICKY = 'sticky right-0 text-right shadow-[-1px_0_0_var(--color-line)]';
+
+/** Accessible on/off switch with a visible label. */
+function Toggle({ checked, onChange, label, disabled }) {
+  return (
+    <label className={cn('flex cursor-pointer select-none items-center gap-2.5 text-[13px] text-ink-2', disabled && 'cursor-wait opacity-60')}>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={cn(
+          'relative h-5 w-9 shrink-0 rounded-full transition-colors duration-150',
+          checked ? 'bg-brand' : 'bg-line-strong',
+        )}
+      >
+        <span className={cn(
+          'absolute left-0.5 top-0.5 size-4 rounded-full bg-white shadow-xs transition-transform duration-150',
+          checked && 'translate-x-4',
+        )} />
+      </button>
+      {label}
+    </label>
+  );
+}
+
+const SHOW_INTERNAL_KEY = 'finvest:admin:showInternal';
 
 function WaitlistCard({ users }) {
   const waiting = users
@@ -138,7 +167,7 @@ function ActivityCard({ months }) {
   );
 }
 
-function UsersCard({ users }) {
+function UsersCard({ users, includeInternal, onToggleInternal, pendingId }) {
   const [query, setQuery] = useState('');
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -150,7 +179,7 @@ function UsersCard({ users }) {
     <Card>
       <CardHeader
         title="Users"
-        description={`${users.length} ${users.length === 1 ? 'account' : 'accounts'}, newest first. Usage is for this month.`}
+        description={`${users.length} ${users.length === 1 ? 'account' : 'accounts'}, newest first. Usage is for this month.${includeInternal ? '' : ' Internal accounts are hidden.'}`}
         action={
           <div className="relative w-56 max-w-full">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-faint" />
@@ -180,11 +209,13 @@ function UsersCard({ users }) {
                 <th className={cn(TH, 'text-right')}>Docs</th>
                 <th className={TH}>Joined</th>
                 <th className={TH}>Last active</th>
+                {/* Pinned to the right so the action stays visible while the wide table scrolls. */}
+                <th className={cn(TH, STICKY, 'bg-subtle')}><span className="sr-only">Internal account</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
               {shown.map((u) => (
-                <tr key={u.id} className="hover:bg-subtle/40">
+                <tr key={u.id} className="group hover:bg-subtle/40">
                   <td className={TD}>
                     <p className="font-medium text-ink">{u.displayName || u.userName}</p>
                     <p className="text-xs text-muted">
@@ -197,6 +228,7 @@ function UsersCard({ users }) {
                     <div className="flex flex-wrap gap-1">
                       <Badge className={PLAN_TONE[u.plan] || PLAN_TONE.free}>{capitalize(u.plan)}</Badge>
                       {u.waitlist && <Badge className="bg-warning-soft text-warning">Wants {capitalize(u.waitlist)}</Badge>}
+                      {u.internal && <Badge className="border border-line-strong text-muted">Internal</Badge>}
                     </div>
                   </td>
                   <td className={cn(TD, 'text-ink-2')}>{u.signIn}</td>
@@ -205,6 +237,20 @@ function UsersCard({ users }) {
                   <td className={cn(TD, 'text-right')}><Num value={u.documents} /></td>
                   <td className={cn(TD, 'text-ink-2')}>{formatDate(u.joinedAt)}</td>
                   <td className={cn(TD, 'text-ink-2')}>{u.lastActiveAt ? formatRelative(u.lastActiveAt) : <span className="text-faint">Never</span>}</td>
+                  <td className={cn(TD, STICKY, 'bg-surface group-hover:bg-subtle')}>
+                    {u.internalReason === 'admin' ? (
+                      <span className="text-xs text-faint" title="Admins never count toward the numbers">Admin, always internal</span>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        loading={pendingId === u.id}
+                        onClick={() => onToggleInternal(u)}
+                      >
+                        {u.internal ? 'Count again' : 'Mark internal'}
+                      </Button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -220,24 +266,71 @@ export default function AdminPage() {
   const isAdmin = account?.usage?.plan === 'admin';
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [includeInternal, setIncludeInternal] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [pendingId, setPendingId] = useState(null);
+
+  // Remember the switch for this browser only; it's a viewing preference, not shared data.
+  useEffect(() => {
+    try {
+      setIncludeInternal(localStorage.getItem(SHOW_INTERNAL_KEY) === 'true');
+    } catch {
+      // Storage can be blocked; the default (hidden) is fine.
+    }
+  }, []);
+
+  const load = useCallback(async (withInternal) => {
+    setRefreshing(true);
+    try {
+      const query = `?includeInternal=${withInternal}`;
+      const [overviewRes, usersRes] = await Promise.all([
+        authenticatedFetch(`${API_URL}/api/admin/overview${query}`),
+        authenticatedFetch(`${API_URL}/api/admin/users${query}`),
+      ]);
+      const [overview, users] = await Promise.all([overviewRes.json(), usersRes.json()]);
+      if (!overviewRes.ok) throw new Error(overview.message || 'Could not load the overview');
+      if (!usersRes.ok) throw new Error(users.message || 'Could not load users');
+      setData({ ...overview, users });
+      setError('');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (!isAdmin) return;
-    (async () => {
-      try {
-        const [overviewRes, usersRes] = await Promise.all([
-          authenticatedFetch(`${API_URL}/api/admin/overview`),
-          authenticatedFetch(`${API_URL}/api/admin/users`),
-        ]);
-        const [overview, users] = await Promise.all([overviewRes.json(), usersRes.json()]);
-        if (!overviewRes.ok) throw new Error(overview.message || 'Could not load the overview');
-        if (!usersRes.ok) throw new Error(users.message || 'Could not load users');
-        setData({ ...overview, users });
-      } catch (err) {
-        setError(err.message);
-      }
-    })();
-  }, [isAdmin]);
+    if (isAdmin) load(includeInternal);
+  }, [isAdmin, includeInternal, load]);
+
+  const changeIncludeInternal = (value) => {
+    setIncludeInternal(value);
+    try {
+      localStorage.setItem(SHOW_INTERNAL_KEY, String(value));
+    } catch {
+      // Not remembered; still applies for this visit.
+    }
+  };
+
+  const toggleInternal = async (user) => {
+    setPendingId(user.id);
+    try {
+      const res = await authenticatedFetch(`${API_URL}/api/admin/users/${user.id}/internal`, {
+        method: 'PATCH',
+        body: JSON.stringify({ internal: !user.internal }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.message || 'Could not update the account');
+      toast.success(body.internal
+        ? `@${user.userName} is now internal and left out of the numbers.`
+        : `@${user.userName} counts toward the numbers again.`);
+      await load(includeInternal);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setPendingId(null);
+    }
+  };
 
   if (account && !isAdmin) {
     return (
@@ -258,7 +351,18 @@ export default function AdminPage() {
 
   return (
     <PageContainer>
-      <PageHeader title="Admin" description="Everyone using Finvest AI, and how much." actions={<ViewSwitch />} />
+      <PageHeader
+        title="Admin"
+        description={data && !includeInternal && data.internalAccounts
+          ? `Everyone using Finvest AI, and how much. ${data.internalAccounts} internal ${data.internalAccounts === 1 ? 'account is' : 'accounts are'} left out of these numbers.`
+          : 'Everyone using Finvest AI, and how much.'}
+        actions={
+          <>
+            <Toggle checked={includeInternal} onChange={changeIncludeInternal} label="Show internal accounts" disabled={refreshing} />
+            <ViewSwitch />
+          </>
+        }
+      />
 
       {error ? (
         <Card><EmptyState icon={ShieldAlert} title="Couldn't load the admin data" description={error} /></Card>
@@ -291,7 +395,7 @@ export default function AdminPage() {
             <ActivityCard months={data.months} />
           </div>
 
-          <UsersCard users={data.users} />
+          <UsersCard users={data.users} includeInternal={includeInternal} onToggleInternal={toggleInternal} pendingId={pendingId} />
         </div>
       )}
     </PageContainer>
